@@ -5,12 +5,21 @@
 -- 1. USERS & AUTH IDENTITY
 CREATE TABLE public.users (
   user_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  phone_number varchar NOT NULL UNIQUE,
+  phone_number varchar UNIQUE,
   email varchar,
   user_type varchar NOT NULL CHECK (user_type IN ('admin', 'buyer', 'seller')),
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_login_at timestamptz
+);
+
+-- 1B. ADMINS PROFILE
+CREATE TABLE IF NOT EXISTS public.admins (
+  admin_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE REFERENCES public.users(user_id) ON DELETE CASCADE,
+  role varchar NOT NULL CHECK (role IN ('super_admin', 'compliance_officer', 'dispute_arbitrator', 'finance_manager')) DEFAULT 'super_admin',
+  permissions jsonb NOT NULL DEFAULT '{"all": true}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 2. BUYERS PROFILE
@@ -264,6 +273,8 @@ CREATE POLICY "public_read_subscription_plans" ON public.subscription_plans FOR 
 CREATE POLICY "public_read_sellers" ON public.sellers FOR SELECT USING (true);
 
 -- Authenticated full access
+CREATE POLICY "auth_all_admins" ON public.admins FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "public_read_admins" ON public.admins FOR SELECT TO public USING (true);
 CREATE POLICY "auth_all_users" ON public.users FOR ALL TO authenticated USING (true);
 CREATE POLICY "auth_all_buyers" ON public.buyers FOR ALL TO authenticated USING (true);
 CREATE POLICY "auth_all_sellers" ON public.sellers FOR ALL TO authenticated USING (true);
@@ -285,3 +296,5 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.product_variants;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.banners;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.whatsapp_click_logs;
+
+
