@@ -1,0 +1,18 @@
+{
+  "name": "yymee",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:buyer": "npm run dev --prefix apps/buyer",
+    "dev:seller": "npm run dev --prefix apps/seller",
+    "dev:admin": "npm run dev --prefix apps/admin",
+    "build": "npm run build --prefix apps/buyer && npm run build --prefix apps/seller && npm run build --prefix apps/admin"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
