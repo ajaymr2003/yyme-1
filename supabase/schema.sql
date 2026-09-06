@@ -288,6 +288,8 @@ CREATE POLICY "auth_all_upgrade_requests" ON public.subscription_upgrade_request
 CREATE POLICY "auth_all_products" ON public.products FOR ALL TO authenticated USING (true);
 CREATE POLICY "auth_all_product_variants" ON public.product_variants FOR ALL TO authenticated USING (true);
 CREATE POLICY "auth_all_banners" ON public.banners FOR ALL TO authenticated USING (true);
+CREATE POLICY "allow_all_categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
+
 
 -- ============================================================================
 -- REALTIME PUBLICATIONS

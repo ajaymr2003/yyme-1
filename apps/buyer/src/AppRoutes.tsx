@@ -9,6 +9,7 @@ import { ShopPage } from './pages/discovery/ShopPage';
 import { SearchPage } from './pages/discovery/SearchPage';
 import { CartPage } from './pages/cart/CartPage';
 import { CheckoutPage } from './pages/checkout/CheckoutPage';
+import { ProductDetailPage } from './pages/discovery/ProductDetailPage';
 
 export function AppRoutes() {
   const { session, loading } = useAuth();
@@ -26,14 +27,15 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/" /> : <LoginPage />} />
       <Route path="/signup" element={session ? <Navigate to="/" /> : <SignupPage />} />
-      <Route element={session ? <BuyerLayout /> : <Navigate to="/login" />}>
+      <Route element={<BuyerLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/shop/category/:categoryId" element={<ShopPage />} />
         <Route path="/shop/category/:categoryId/:subCategoryId" element={<ShopPage />} />
+        <Route path="/product/:id" element={<ProductDetailPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/checkout" element={session ? <CheckoutPage /> : <Navigate to="/login" />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

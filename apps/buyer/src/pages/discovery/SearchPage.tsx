@@ -1,27 +1,41 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import { Search, ShoppingCart, X } from 'lucide-react';
 
 export function SearchPage() {
-  const [query, setQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get('q') || '';
+  const [query, setQuery] = useState(urlQuery);
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const { addItem } = useCart();
   const navigate = useNavigate();
 
-  async function doSearch() {
-    if (!query.trim()) return;
+  async function doSearch(searchTerm?: string) {
+    const term = searchTerm !== undefined ? searchTerm : query;
+    if (!term.trim()) return;
     setLoading(true);
     setSearched(true);
-    const { data } = await supabase.from('products').select('*, seller:sellers(business_name, whatsapp_number), category:categories(name)')
-      .eq('is_active', true).ilike('name', `%${query.trim()}%`).order('created_at', { ascending: false });
+    const { data } = await supabase
+      .from('products')
+      .select('*, seller:sellers(business_name, whatsapp_number), category:categories(name)')
+      .eq('is_active', true)
+      .ilike('name', `%${term.trim()}%`)
+      .order('created_at', { ascending: false });
     setResults(data ?? []);
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (urlQuery) {
+      setQuery(urlQuery);
+      doSearch(urlQuery);
+    }
+  }, [urlQuery]);
 
   return (
     <div className="px-4 py-4">
@@ -34,7 +48,7 @@ export function SearchPage() {
               className="w-full pl-9 pr-3 py-2 bg-white border border-neutral-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="Search products..." autoFocus />
           </div>
-          <button onClick={doSearch} className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors">
+          <button onClick={() => doSearch()} className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors">
             Search
           </button>
         </div>
@@ -51,14 +65,16 @@ export function SearchPage() {
         <div className="space-y-3">
           {results.map(product => (
             <div key={product.product_id} className="bg-white border border-neutral-200 rounded-xl p-3 flex gap-3 shadow-sm">
-              <div className="w-20 h-20 bg-neutral-100 rounded-lg flex-shrink-0 flex items-center justify-center">
+              <Link to={`/product/${product.product_id}`} className="w-20 h-20 bg-neutral-100 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                 {product.image_urls?.[0] ? (
                   <img src={product.image_urls[0]} alt={product.name} className="w-full h-full object-cover rounded-lg" />
                 ) : <span className="text-2xl">📦</span>}
-              </div>
+              </Link>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-medium text-emerald-600 uppercase">{product.category?.name}</p>
-                <h4 className="text-sm font-semibold text-neutral-900 truncate">{product.name}</h4>
+                <Link to={`/product/${product.product_id}`}>
+                  <h4 className="text-sm font-semibold text-neutral-900 truncate hover:text-emerald-700 transition-colors">{product.name}</h4>
+                </Link>
                 <p className="text-[10px] text-neutral-500">{product.seller?.business_name}</p>
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-sm font-bold text-neutral-900">{formatINR(product.base_price)}</span>

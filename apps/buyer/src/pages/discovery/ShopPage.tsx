@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
@@ -90,17 +90,19 @@ export function ShopPage() {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 gap-3">
           {products.map(product => (
-            <div key={product.product_id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-              <div className="aspect-square bg-neutral-100 flex items-center justify-center">
+            <div key={product.product_id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+              <Link to={`/product/${product.product_id}`} className="aspect-square bg-neutral-100 flex items-center justify-center block">
                 {product.image_urls?.[0] ? (
                   <img src={product.image_urls[0]} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-3xl">📦</span>
                 )}
-              </div>
+              </Link>
               <div className="p-3">
                 <p className="text-[10px] font-medium text-emerald-600 uppercase">{product.category?.name}</p>
-                <h4 className="text-sm font-semibold text-neutral-900 mt-0.5 line-clamp-2">{product.name}</h4>
+                <Link to={`/product/${product.product_id}`} className="block">
+                  <h4 className="text-sm font-semibold text-neutral-900 mt-0.5 line-clamp-2 hover:text-emerald-700 transition-colors">{product.name}</h4>
+                </Link>
                 <p className="text-[10px] text-neutral-500 mt-0.5">by {product.seller?.business_name}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-base font-bold text-neutral-900">{formatINR(product.base_price)}</span>
@@ -117,14 +119,16 @@ export function ShopPage() {
         <div className="space-y-3">
           {products.map(product => (
             <div key={product.product_id} className="bg-white border border-neutral-200 rounded-xl p-3 flex gap-3 shadow-sm">
-              <div className="w-20 h-20 bg-neutral-100 rounded-lg flex-shrink-0 flex items-center justify-center">
+              <Link to={`/product/${product.product_id}`} className="w-20 h-20 bg-neutral-100 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
                 {product.image_urls?.[0] ? (
                   <img src={product.image_urls[0]} alt={product.name} className="w-full h-full object-cover rounded-lg" />
                 ) : <span className="text-2xl">📦</span>}
-              </div>
+              </Link>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-medium text-emerald-600 uppercase">{product.category?.name}</p>
-                <h4 className="text-sm font-semibold text-neutral-900 truncate">{product.name}</h4>
+                <Link to={`/product/${product.product_id}`}>
+                  <h4 className="text-sm font-semibold text-neutral-900 truncate hover:text-emerald-700 transition-colors">{product.name}</h4>
+                </Link>
                 <p className="text-[10px] text-neutral-500">{product.seller?.business_name}</p>
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-sm font-bold text-neutral-900">{formatINR(product.base_price)}</span>

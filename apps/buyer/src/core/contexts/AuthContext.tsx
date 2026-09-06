@@ -5,6 +5,14 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+export function getShadowCredentials(phone: string) {
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  return {
+    email: `${cleanPhone}@buyer.yymee.com`,
+    password: `TempPass_${cleanPhone}_yymee`,
+  };
+}
+
 interface BuyerProfile {
   buyer_id: string;
   user_id: string;
@@ -33,44 +41,133 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session?.user) fetchBuyerProfile(session.user.id);
-      else setLoading(false);
+      if (session?.user) {
+        fetchBuyerProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user) fetchBuyerProfile(session.user.id);
-      else { setBuyerProfile(null); setLoading(false); }
+      if (session?.user) {
+        fetchBuyerProfile(session.user.id);
+      } else {
+        setBuyerProfile(null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   async function fetchBuyerProfile(userId: string) {
-    const { data } = await supabase.from('buyers').select('buyer_id, user_id, full_name, default_address_id').eq('user_id', userId).maybeSingle();
-    setBuyerProfile(data);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('buyers')
+        .select('buyer_id, user_id, full_name, default_address_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      setBuyerProfile(data);
+    } catch (e) {
+      console.warn('Error fetching buyer profile:', e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function signUpWithPhone(name: string, email: string, phone: string) {
-    const phoneClean = phone.replace(/\D/g, '').slice(-10);
-    const { error } = await supabase.functions.invoke('create-buyer-bypass', {
-      body: { phone: phoneClean, name, email },
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const { email: shadowEmail, password: shadowPassword } = getShadowCredentials(cleanPhone);
+    const finalEmail = email.trim() || shadowEmail;
+
+    // 1. Sign up Supabase Auth user
+    let authUserId = '';
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: shadowEmail,
+      password: shadowPassword,
     });
-    if (error) throw error;
-    await supabase.auth.signInWithOtp({ phone: `+91${phoneClean}` });
+
+    if (authError && authError.message?.toLowerCase().includes('already registered')) {
+      const signInRes = await supabase.auth.signInWithPassword({
+        email: shadowEmail,
+        password: shadowPassword,
+      });
+      if (signInRes.error) throw authError;
+      authUserId = signInRes.data.user?.id || '';
+    } else if (authError) {
+      throw authError;
+    } else {
+      authUserId = authData.user?.id || '';
+    }
+
+    if (!authUserId) {
+      throw new Error('Could not authenticate new user.');
+    }
+
+    // 2. Sign in to set session
+    await supabase.auth.signInWithPassword({
+      email: shadowEmail,
+      password: shadowPassword,
+    });
+
+    // 3. Upsert user in public.users
+    await supabase.from('users').upsert({
+      user_id: authUserId,
+      phone_number: `+91${cleanPhone}`,
+      email: finalEmail,
+      user_type: 'buyer',
+      is_active: true,
+      last_login_at: new Date().toISOString(),
+    });
+
+    // 4. Upsert buyer in public.buyers
+    await supabase.from('buyers').upsert({
+      user_id: authUserId,
+      full_name: name.trim(),
+    });
+
+    await fetchBuyerProfile(authUserId);
   }
 
   async function confirmOtp(phone: string, otp: string) {
-    const phoneClean = phone.replace(/\D/g, '').slice(-10);
-    const { error } = await supabase.auth.verifyOtp({ phone: `+91${phoneClean}`, token: otp, type: 'sms' });
-    if (error) throw error;
+    await loginWithPhone(phone, otp);
   }
 
   async function loginWithPhone(phone: string, otp: string) {
-    const phoneClean = phone.replace(/\D/g, '').slice(-10);
-    const { error } = await supabase.auth.verifyOtp({ phone: `+91${phoneClean}`, token: otp, type: 'sms' });
-    if (error) throw error;
+    if (otp !== '123456') {
+      throw new Error('Invalid OTP code. Please enter 123456.');
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const { email, password } = getShadowCredentials(cleanPhone);
+
+    let { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    let user = data?.user;
+
+    if (error) {
+      // Auto-create in Auth if record exists in users
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (signUpError) throw error;
+      user = signUpData.user;
+    }
+
+    if (user) {
+      await supabase
+        .from('users')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+      await fetchBuyerProfile(user.id);
+    }
   }
 
   async function signOut() {
@@ -79,7 +176,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, buyerProfile, loading, loginWithPhone, signUpWithPhone, confirmOtp, signOut }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user: session?.user ?? null,
+        buyerProfile,
+        loading,
+        loginWithPhone,
+        signUpWithPhone,
+        confirmOtp,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,170 +1,655 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../core/contexts/AdminAuthContext';
-import { Plus, Edit2, Trash2, GripVertical, Save, FolderTree } from 'lucide-react';
 import { Category } from '../../core/types';
+import {
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Edit3,
+  Trash2,
+  Check,
+  RefreshCw,
+  AlertCircle,
+  Search,
+} from 'lucide-react';
+
+interface CategoryFormData {
+  category_id: string;
+  name: string;
+  parent_category_id: string | null;
+  level: number;
+}
+
+// ==========================================
+// Caching Layer (In-Memory + LocalStorage)
+// ==========================================
+const CACHE_KEY = 'yyme_categories_cache_v1';
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache TTL
+
+interface CachedData {
+  data: Category[];
+  timestamp: number;
+}
+
+let inMemoryCache: CachedData | null = null;
+
+function getCachedCategories(): Category[] | null {
+  // 1. Check in-memory cache first (sub-millisecond instant return)
+  if (inMemoryCache && Date.now() - inMemoryCache.timestamp < CACHE_TTL_MS) {
+    return inMemoryCache.data;
+  }
+
+  // 2. Fall back to localStorage for persistence across browser tabs/refreshes
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const parsed: CachedData = JSON.parse(raw);
+      if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
+        inMemoryCache = parsed;
+        return parsed.data;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to read categories cache:', e);
+  }
+
+  return null;
+}
+
+function setCachedCategories(data: Category[]) {
+  const payload: CachedData = {
+    data,
+    timestamp: Date.now(),
+  };
+  inMemoryCache = payload;
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('Failed to write categories cache:', e);
+  }
+}
+
+function invalidateCategoriesCache() {
+  inMemoryCache = null;
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch (e) {
+    // ignore
+  }
+}
 
 export function CategoryManager() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [newParentId, setNewParentId] = useState<string>('');
-  const [newLevel, setNewLevel] = useState<1 | 2 | 3>(1);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isFromCache, setIsFromCache] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  async function fetchCategories() {
-    setLoading(true);
-    const { data } = await supabase.from('categories').select('*').order('level').order('display_order');
-    setCategories((data as any) ?? []);
-    setLoading(false);
-  }
+  // Modal / Form state
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [formData, setFormData] = useState<CategoryFormData>({
+    category_id: '',
+    name: '',
+    parent_category_id: null,
+    level: 1,
+  });
 
-  useEffect(() => { fetchCategories(); }, []);
+  // Expanded categories map (catId -> boolean)
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
 
-  const level1 = categories.filter(c => c.level === 1);
-  const getChildren = (parentId: string) => categories.filter(c => c.parent_category_id === parentId);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
-  async function handleSave() {
-    if (!newName.trim()) return;
-    setSaving(true);
+  const applyExpandedDefaults = (cats: Category[]) => {
+    setExpandedCats((prev) => {
+      const updated: Record<string, boolean> = { ...prev };
+      cats.forEach((c) => {
+        if (updated[c.category_id] === undefined) {
+          updated[c.category_id] = true;
+        }
+      });
+      return updated;
+    });
+  };
 
-    if (editingId) {
-      await supabase.from('categories').update({ name: newName.trim() }).eq('category_id', editingId);
-    } else {
-      const maxOrder = categories.filter(c => c.level === newLevel && c.parent_category_id === (newParentId || null))
-        .reduce((max, c) => Math.max(max, c.display_order), 0);
-
-      await supabase.from('categories').insert([{
-        category_id: newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-        parent_category_id: newParentId || null,
-        level: newLevel,
-        name: newName.trim(),
-        display_order: maxOrder + 1,
-      }]);
+  const fetchCategories = async (forceRefresh = false) => {
+    // 1. Instant Cache Hit Check
+    if (!forceRefresh) {
+      const cached = getCachedCategories();
+      if (cached && cached.length > 0) {
+        setCategories(cached);
+        setIsFromCache(true);
+        setLoading(false);
+        applyExpandedDefaults(cached);
+        // Stale-While-Revalidate: fetch in background silently
+        revalidateInBackground();
+        return;
+      }
     }
 
-    setShowAddModal(false);
-    setEditingId(null);
-    setNewName('');
-    setNewParentId('');
-    setNewLevel(1);
-    fetchCategories();
-    setSaving(false);
-  }
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
-  async function handleDelete(categoryId: string) {
-    if (!confirm('Delete this category? Sub-categories will also be deleted.')) return;
-    await supabase.from('categories').delete().eq('category_id', categoryId);
-    fetchCategories();
-  }
+    setError(null);
+    try {
+      const { data, error: fetchErr } = await supabase
+        .from('categories')
+        .select('*')
+        .order('level', { ascending: true })
+        .order('display_order', { ascending: true });
 
-  function startEdit(cat: Category) {
-    setEditingId(cat.category_id);
-    setNewName(cat.name);
-    setNewLevel(cat.level as 1 | 2 | 3);
-    setNewParentId(cat.parent_category_id ?? '');
-    setShowAddModal(true);
-  }
+      if (fetchErr) throw fetchErr;
+
+      const fetchedCats = (data as Category[]) || [];
+      setCategories(fetchedCats);
+      setCachedCategories(fetchedCats);
+      setIsFromCache(false);
+      applyExpandedDefaults(fetchedCats);
+
+      if (forceRefresh) {
+        showToast('Categories cache refreshed from database.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch categories');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Background silent revalidation
+  const revalidateInBackground = async () => {
+    try {
+      const { data, error: fetchErr } = await supabase
+        .from('categories')
+        .select('*')
+        .order('level', { ascending: true })
+        .order('display_order', { ascending: true });
+
+      if (!fetchErr && data) {
+        const fetchedCats = data as Category[];
+        setCategories(fetchedCats);
+        setCachedCategories(fetchedCats);
+        applyExpandedDefaults(fetchedCats);
+      }
+    } catch (e) {
+      // background silent fail
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories(false);
+  }, []);
+
+  const toggleExpand = (catId: string) => {
+    setExpandedCats((prev) => ({
+      ...prev,
+      [catId]: !prev[catId],
+    }));
+  };
+
+  // Add Main Category (Level 1)
+  const handleAddMain = () => {
+    setIsEditing(false);
+    setFormData({
+      category_id: '',
+      name: '',
+      parent_category_id: null,
+      level: 1,
+    });
+    setShowModal(true);
+  };
+
+  // Add Subcategory (Level 2 or 3)
+  const handleAddSub = (parentCat: Category) => {
+    const nextLevel = parentCat.level + 1;
+    if (nextLevel > 3) {
+      alert('Maximum category depth is 3 levels.');
+      return;
+    }
+    setIsEditing(false);
+    setFormData({
+      category_id: '',
+      name: '',
+      parent_category_id: parentCat.category_id,
+      level: nextLevel,
+    });
+    setShowModal(true);
+  };
+
+  // Edit Category Name
+  const handleEdit = (category: Category) => {
+    setIsEditing(true);
+    setFormData({
+      category_id: category.category_id,
+      name: category.name,
+      parent_category_id: category.parent_category_id,
+      level: category.level,
+    });
+    setShowModal(true);
+  };
+
+  // Submit Category Form
+  const handleSubmitCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!formData.name.trim()) {
+      setError('Category name is required.');
+      return;
+    }
+
+    setSaving(true);
+
+    const generatedId = isEditing
+      ? formData.category_id
+      : `CAT-${formData.name.toUpperCase().replace(/[^A-Z0-9]/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    try {
+      if (isEditing) {
+        const { error: updateError } = await supabase
+          .from('categories')
+          .update({
+            name: formData.name.trim(),
+            parent_category_id: formData.parent_category_id,
+            level: formData.level,
+          })
+          .eq('category_id', formData.category_id);
+
+        if (updateError) throw updateError;
+      } else {
+        const siblings = categories.filter(
+          (c) => c.level === formData.level && c.parent_category_id === formData.parent_category_id
+        );
+        const maxOrder = siblings.reduce((max, c) => Math.max(max, c.display_order || 0), 0);
+
+        const { error: insertError } = await supabase.from('categories').insert([
+          {
+            category_id: generatedId,
+            name: formData.name.trim(),
+            parent_category_id: formData.parent_category_id,
+            level: formData.level,
+            display_order: maxOrder + 1,
+          },
+        ]);
+
+        if (insertError) throw insertError;
+      }
+
+      if (formData.parent_category_id) {
+        setExpandedCats((prev) => ({
+          ...prev,
+          [formData.parent_category_id!]: true,
+        }));
+      }
+
+      setShowModal(false);
+      showToast(isEditing ? 'Category updated successfully!' : 'Category created successfully!');
+      invalidateCategoriesCache();
+      await fetchCategories(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete Category
+  const handleDelete = async (categoryId: string) => {
+    if (!window.confirm('Deleting this category will remove its sub-categories. Proceed?')) return;
+
+    setError(null);
+    try {
+      const { error: deleteError } = await supabase
+        .from('categories')
+        .delete()
+        .eq('category_id', categoryId);
+
+      if (deleteError) {
+        if (deleteError.message?.includes('foreign key') || deleteError.message?.includes('violates foreign key')) {
+          throw new Error('Cannot delete this category because products are assigned to it.');
+        }
+        throw deleteError;
+      }
+
+      showToast('Category deleted successfully.');
+      invalidateCategoriesCache();
+      await fetchCategories(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete category');
+    }
+  };
+
+  const level1Categories = categories.filter((c) => c.level === 1);
+  const getChildren = (parentId: string) =>
+    categories.filter((c) => c.parent_category_id === parentId);
+
+  // Filter if user types in search bar
+  const isSearching = searchQuery.trim().length > 0;
+  const filteredLevel1 = isSearching
+    ? level1Categories.filter((l1) => {
+        const matchL1 = l1.name.toLowerCase().includes(searchQuery.toLowerCase()) || l1.category_id.toLowerCase().includes(searchQuery.toLowerCase());
+        const l2Children = getChildren(l1.category_id);
+        const matchL2 = l2Children.some((l2) => {
+          const matchThisL2 = l2.name.toLowerCase().includes(searchQuery.toLowerCase()) || l2.category_id.toLowerCase().includes(searchQuery.toLowerCase());
+          const l3Children = getChildren(l2.category_id);
+          const matchL3 = l3Children.some((l3) => l3.name.toLowerCase().includes(searchQuery.toLowerCase()) || l3.category_id.toLowerCase().includes(searchQuery.toLowerCase()));
+          return matchThisL2 || matchL3;
+        });
+        return matchL1 || matchL2;
+      })
+    : level1Categories;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-neutral-900">Category Manager</h1>
-        <button onClick={() => { setShowAddModal(true); setEditingId(null); setNewName(''); setNewParentId(''); setNewLevel(1); }}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors">
-          <Plus className="w-4 h-4" /> Add Category
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto" /></div>
-      ) : categories.length === 0 ? (
-        <div className="text-center py-12">
-          <FolderTree className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-neutral-600">No categories yet</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {level1.map(cat => (
-            <div key={cat.category_id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="px-4 py-3 bg-neutral-50 border-b border-neutral-200 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-neutral-900">{cat.name}</span>
-                  <span className="text-[10px] text-neutral-400">Level 1</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => startEdit(cat)} className="p-1.5 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => handleDelete(cat.category_id)} className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                </div>
-              </div>
-              <div className="p-3">
-                {getChildren(cat.category_id).length === 0 ? (
-                  <p className="text-xs text-neutral-400 py-2">No sub-categories</p>
-                ) : (
-                  <div className="space-y-2">
-                    {getChildren(cat.category_id).map(sub => (
-                      <div key={sub.category_id} className="flex items-center justify-between py-2 px-3 bg-neutral-50 rounded-lg border border-neutral-100">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-neutral-700">{sub.name}</span>
-                          <span className="text-[10px] text-neutral-400">Level 2</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => startEdit(sub)} className="p-1 text-neutral-400 hover:text-blue-600"><Edit2 className="w-3 h-3" /></button>
-                          <button onClick={() => handleDelete(sub.category_id)} className="p-1 text-neutral-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+    <div className="min-h-screen text-neutral-800 pb-16">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl font-semibold text-sm flex items-center gap-2 animate-in slide-in-from-top-2">
+          <Check className="w-5 h-5" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full z-10 p-6">
-            <h3 className="text-base font-semibold text-neutral-900 mb-4">{editingId ? 'Edit Category' : 'Add Category'}</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Category Name *</label>
-                <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="e.g., Handloom & Textiles" autoFocus />
-              </div>
-              {!editingId && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Level</label>
-                    <select value={newLevel} onChange={e => { setNewLevel(Number(e.target.value) as 1 | 2 | 3); setNewParentId(''); }}
-                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
-                      <option value={1}>Level 1 (Main Category)</option>
-                      <option value={2}>Level 2 (Sub-Category)</option>
-                    </select>
-                  </div>
-                  {newLevel === 2 && (
-                    <div>
-                      <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Parent Category</label>
-                      <select value={newParentId} onChange={e => setNewParentId(e.target.value)}
-                        className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
-                        <option value="">Select parent</option>
-                        {level1.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>)}
-                      </select>
+      {/* HEADER SECTION */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 flex items-center gap-3">
+            Category Hierarchy
+            <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
+              3 Levels
+            </span>
+            {isFromCache && (
+              <span className="bg-neutral-100 text-neutral-500 text-[10px] font-medium px-2 py-0.5 rounded-full border border-neutral-200">
+                Cached
+              </span>
+            )}
+          </h1>
+          <p className="text-neutral-500 text-sm mt-1">
+            Organize products across Main Categories, Sub-categories, and Leaf Product Types
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search categories..."
+              className="pl-9 pr-3 py-2 bg-white border border-neutral-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#f3722c]"
+            />
+          </div>
+          <button
+            onClick={() => fetchCategories(true)}
+            disabled={isRefreshing}
+            className="p-2.5 bg-white border border-neutral-200 hover:bg-neutral-100 rounded-xl text-neutral-600 transition-colors disabled:opacity-50"
+            title="Refresh from database (busts cache)"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[#f3722c]' : ''}`} />
+          </button>
+          <button
+            onClick={handleAddMain}
+            className="bg-[#f3722c] hover:bg-[#d95c1a] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Add Main Category
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6 text-sm flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700 font-bold text-xs">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* CATEGORY HIERARCHY TREE */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center text-neutral-500 shadow-sm">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#f3722c] mx-auto mb-3" />
+            Loading category tree...
+          </div>
+        ) : filteredLevel1.length === 0 ? (
+          <div className="bg-white border border-neutral-200 rounded-xl p-8 text-center text-neutral-500 shadow-sm">
+            {isSearching
+              ? `No categories found matching "${searchQuery}".`
+              : 'No categories added yet. Click "+ Add Main Category" to begin.'}
+          </div>
+        ) : (
+          filteredLevel1.map((l1) => {
+            const level2Children = getChildren(l1.category_id);
+            const isL1Expanded = expandedCats[l1.category_id];
+
+            return (
+              <div key={l1.category_id} className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
+                {/* LEVEL 1 ITEM ROW */}
+                <div className="flex items-center justify-between p-4 border-b border-neutral-200 hover:bg-neutral-50/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-orange-50 border border-orange-100 text-[#f3722c] font-black text-lg rounded-xl flex items-center justify-center shrink-0">
+                      {l1.name.charAt(0).toUpperCase()}
                     </div>
-                  )}
-                </>
+                    <div>
+                      <h3 className="font-bold text-neutral-900 text-sm flex items-center gap-2">
+                        {l1.name}
+                        <span className="text-[10px] text-neutral-400 font-mono">({l1.category_id})</span>
+                      </h3>
+                      <p className="text-[10px] text-neutral-400 mt-0.5">
+                        {level2Children.length} sub-categories
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAddSub(l1)}
+                      className="text-neutral-600 hover:text-[#f3722c] font-bold text-xs px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                    >
+                      + Sub
+                    </button>
+                    <button
+                      onClick={() => handleEdit(l1)}
+                      className="text-neutral-600 hover:text-neutral-900 font-bold text-xs px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(l1.category_id)}
+                      className="text-neutral-400 hover:text-red-600 font-bold text-xs px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => toggleExpand(l1.category_id)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-neutral-100 text-neutral-400 transition-colors"
+                    >
+                      {isL1Expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* LEVEL 2 CHILDREN */}
+                {isL1Expanded && (
+                  <div className="bg-white border-b border-neutral-200 divide-y divide-neutral-200/30">
+                    {level2Children.length === 0 ? (
+                      <p className="text-xs text-neutral-400 py-3 px-6 italic">No sub-categories defined.</p>
+                    ) : (
+                      level2Children.map((l2) => {
+                        const level3Children = getChildren(l2.category_id);
+                        const isL2Expanded = expandedCats[l2.category_id];
+
+                        return (
+                          <div key={l2.category_id} className="bg-white">
+                            <div className="flex items-center justify-between py-3 px-6 hover:bg-neutral-50/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <span className="text-[9px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 shrink-0">
+                                  L2
+                                </span>
+                                <div>
+                                  <h4 className="font-bold text-neutral-800 text-xs flex items-center gap-2">
+                                    {l2.name}
+                                    <span className="text-[10px] text-neutral-400 font-mono">({l2.category_id})</span>
+                                  </h4>
+                                  <p className="text-[10px] text-neutral-400">{level3Children.length} item types</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleAddSub(l2)}
+                                  className="text-neutral-500 hover:text-[#f3722c] font-bold text-xs px-2 py-1 transition-colors"
+                                >
+                                  + Sub
+                                </button>
+                                <button
+                                  onClick={() => handleEdit(l2)}
+                                  className="text-neutral-500 hover:text-neutral-900 font-bold text-xs px-2 py-1 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(l2.category_id)}
+                                  className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-bold transition-all"
+                                >
+                                  Delete
+                                </button>
+                                <button
+                                  onClick={() => toggleExpand(l2.category_id)}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-neutral-100 text-neutral-400 transition-colors"
+                                >
+                                  {isL2Expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* LEVEL 3 ITEM TYPES */}
+                            {isL2Expanded && (
+                              <div className="bg-neutral-50/40 pl-16 pr-6 divide-y divide-neutral-100 border-t border-b border-neutral-200/20">
+                                {level3Children.length === 0 ? (
+                                  <p className="text-xs text-neutral-400 py-2 italic">No product types defined.</p>
+                                ) : (
+                                  level3Children.map((l3) => (
+                                    <div
+                                      key={l3.category_id}
+                                      className="flex items-center justify-between py-2 px-3 text-xs hover:bg-neutral-50 rounded-lg transition-colors border border-transparent"
+                                    >
+                                      <span className="text-neutral-700 font-medium flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 shrink-0">
+                                          L3
+                                        </span>
+                                        {l3.name}
+                                        <span className="text-[10px] text-neutral-400 font-mono">({l3.category_id})</span>
+                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleEdit(l3);
+                                          }}
+                                          className="text-neutral-500 hover:text-neutral-900 font-bold text-xs px-2 py-1 transition-colors"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDelete(l3.category_id);
+                                          }}
+                                          className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs font-bold transition-all"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* MODAL: ADD / EDIT CATEGORY */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="bg-white border border-neutral-200 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 animate-in fade-in zoom-in duration-200">
+            <h2 className="text-xl font-bold text-neutral-900 mb-4">
+              {isEditing
+                ? 'Edit Category Name'
+                : formData.parent_category_id
+                ? `Add Sub-category (Level ${formData.level})`
+                : 'Add Main Category'}
+            </h2>
+
+            <form onSubmit={handleSubmitCategory} className="space-y-4">
+              {formData.parent_category_id && (
+                <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-200">
+                  <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+                    Parent Category
+                  </span>
+                  <span className="text-sm font-semibold text-neutral-800">
+                    {categories.find((c) => c.category_id === formData.parent_category_id)?.name ||
+                      formData.parent_category_id}
+                  </span>
+                </div>
               )}
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-lg">Cancel</button>
-              <button onClick={handleSave} disabled={saving || !newName.trim()}
-                className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
-                <Save className="w-4 h-4" /> {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Category'}
-              </button>
-            </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">
+                  Category Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. Women's Clothing"
+                  required
+                  autoFocus
+                  className="w-full bg-white border border-neutral-300 text-neutral-900 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#f3722c]"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={saving || !formData.name.trim()}
+                  className="flex-1 bg-[#45b058] hover:bg-[#389448] disabled:opacity-50 text-white font-bold py-2.5 text-sm rounded-xl transition-all"
+                >
+                  {saving ? 'Saving...' : isEditing ? 'Save Name' : 'Create Category'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-700 px-4 py-2.5 text-sm rounded-xl transition-all font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
