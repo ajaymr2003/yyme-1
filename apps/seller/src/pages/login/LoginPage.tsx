@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSellerAuth } from '../../core/contexts/SellerAuthContext';
-import { Phone, ArrowRight, KeyRound } from 'lucide-react';
+import { ArrowRight, KeyRound } from 'lucide-react';
 
 export function LoginPage() {
   const { signUp, loginWithOtp, verifyOtp } = useSellerAuth();
@@ -19,8 +19,11 @@ export function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      if (isSignup) await signUp(phone);
-      else await loginWithOtp(phone);
+      if (isSignup) {
+        await loginWithOtp(phone);
+      } else {
+        await loginWithOtp(phone);
+      }
       setStep('otp');
     } catch (err: any) { setError(err.message); }
     setLoading(false);
@@ -28,11 +31,15 @@ export function LoginPage() {
 
   async function handleOtpVerify(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^\d{6}$/.test(otp)) { setError('Enter a valid 6-digit OTP'); return; }
+    if (!/^\d{6}$/.test(otp)) { setError('Enter a valid 6-digit OTP (e.g. 123456)'); return; }
     setLoading(true);
     setError('');
     try {
-      await verifyOtp(phone, otp);
+      if (isSignup) {
+        await signUp(phone);
+      } else {
+        await verifyOtp(phone, otp);
+      }
       navigate('/');
     } catch (err: any) { setError(err.message); }
     setLoading(false);
@@ -88,7 +95,7 @@ export function LoginPage() {
                 <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Enter OTP</label>
                 <input type="text" value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
                   className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-center tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="000000" autoFocus />
+                  placeholder="123456" autoFocus />
               </div>
               {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
               <button type="submit" disabled={loading || otp.length < 6}

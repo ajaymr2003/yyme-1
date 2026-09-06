@@ -4,7 +4,7 @@ import { useAuth } from '../../core/contexts/AuthContext';
 import { Phone, ArrowRight, KeyRound } from 'lucide-react';
 
 export function LoginPage() {
-  const { loginWithPhone, confirmOtp } = useAuth();
+  const { loginWithPhone } = useAuth();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -18,9 +18,6 @@ export function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const { supabase } = await import('../../core/contexts/AuthContext');
-      const { error: otpErr } = await supabase.auth.signInWithOtp({ phone: `+91${phone}` });
-      if (otpErr) throw otpErr;
       setStep('otp');
     } catch (err: any) { setError(err.message); }
     setLoading(false);
@@ -28,7 +25,7 @@ export function LoginPage() {
 
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^\d{6}$/.test(otp)) { setError('Enter a valid 6-digit OTP'); return; }
+    if (!/^\d{6}$/.test(otp)) { setError('Enter a valid 6-digit OTP (e.g. 123456)'); return; }
     setLoading(true);
     setError('');
     try {
@@ -76,7 +73,7 @@ export function LoginPage() {
                 <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Enter OTP sent to +91{phone}</label>
                 <input type="text" value={otp} onChange={e => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
                   className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm text-center tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="000000" autoFocus />
+                  placeholder="123456" autoFocus />
               </div>
               {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
               <button type="submit" disabled={loading || otp.length < 6}

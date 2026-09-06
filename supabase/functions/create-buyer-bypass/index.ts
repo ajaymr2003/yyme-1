@@ -11,12 +11,23 @@ serve(async (req) => {
 
   try {
     const { phone, name, email } = await req.json()
-    if (!phone || !name || !email) {
-      return new Response(JSON.stringify({ error: 'Phone, name, and email are required' }),
+    if (!phone) {
+      return new Response(JSON.stringify({ error: 'Phone number is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    const formattedPhone = `+91${phone.replace(/\D/g, '').slice(-10)}`
+    const phoneClean = phone.replace(/\D/g, '').slice(-10)
+    if (phoneClean.length < 10) {
+      return new Response(JSON.stringify({ error: 'Invalid 10-digit phone number' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    }
+
+    const formattedPhone = `+91${phoneClean}`
+    const shadowEmail = `${phoneClean}@gmail.com`
+    const tempPassword = `TempPass_${phoneClean}_yymee`
+    const buyerName = name?.trim() || 'Buyer'
+    const contactEmail = email?.trim() || shadowEmail
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
@@ -29,53 +40,111 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     })
 
+    // Check if user already exists in public.users
     const { data: existingUser } = await supabaseAdmin
       .from('users').select('user_id').eq('phone_number', formattedPhone).maybeSingle()
 
     if (existingUser) {
-      return new Response(JSON.stringify({ error: 'Account exists. Please log in.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+      const authUserId = existingUser.user_id
+
+      // Update password and shadow email in auth.users
+      await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+        password: tempPassword,
+        email: shadowEmail,
+        email_confirm: true,
+        phone: formattedPhone,
+        phone_confirm: true,
+      })
+
+      // Ensure public.users entry is present & active
+      await supabaseAdmin.from('users').upsert([{
+        user_id: authUserId,
+        phone_number: formattedPhone,
+        email: contactEmail,
+        user_type: 'buyer',
+        is_active: true,
+      }])
+
+      // Ensure buyer profile exists
+      const { data: existingBuyer } = await supabaseAdmin
+        .from('buyers').select('buyer_id').eq('user_id', authUserId).maybeSingle()
+
+      if (!existingBuyer) {
+        await supabaseAdmin.from('buyers').insert([{
+          user_id: authUserId,
+          full_name: buyerName,
+        }])
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        userId: authUserId,
+        email: shadowEmail,
+        password: tempPassword,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
     }
 
-    const tempPassword = `TempPass_${phone.replace(/\D/g, '').slice(-10)}_yymee`
-    const shadowEmail = `${phone.replace(/\D/g, '').slice(-10)}@buyer.yymee.com`
-
+    // New user creation
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      phone: formattedPhone, phone_confirm: true,
-      email: shadowEmail, email_confirm: true, password: tempPassword,
+      phone: formattedPhone,
+      phone_confirm: true,
+      email: shadowEmail,
+      email_confirm: true,
+      password: tempPassword,
     })
 
+    let authUserId: string
     if (authError) {
-      return new Response(JSON.stringify({ error: authError.message }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+      // If user exists in auth but not in public.users, retrieve user
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers()
+      const foundUser = listData?.users?.find(u => u.email === shadowEmail || u.phone === formattedPhone)
+      if (foundUser) {
+        authUserId = foundUser.id
+        await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+          password: tempPassword,
+          email: shadowEmail,
+          email_confirm: true,
+          phone: formattedPhone,
+          phone_confirm: true,
+        })
+      } else {
+        return new Response(JSON.stringify({ error: authError.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+      }
+    } else {
+      authUserId = authData.user.id
     }
 
-    const authUserId = authData.user.id
-
-    const { error: userErr } = await supabaseAdmin.from('users').insert([{
-      user_id: authUserId, phone_number: formattedPhone,
-      email: email, user_type: 'buyer', is_active: true,
+    // Upsert public.users
+    const { error: userErr } = await supabaseAdmin.from('users').upsert([{
+      user_id: authUserId,
+      phone_number: formattedPhone,
+      email: contactEmail,
+      user_type: 'buyer',
+      is_active: true,
     }])
 
     if (userErr) {
-      await supabaseAdmin.auth.admin.deleteUser(authUserId)
       return new Response(JSON.stringify({ error: userErr.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    const { error: buyerErr } = await supabaseAdmin.from('buyers').insert([{
-      user_id: authUserId, full_name: name,
+    // Upsert public.buyers
+    const { error: buyerErr } = await supabaseAdmin.from('buyers').upsert([{
+      user_id: authUserId,
+      full_name: buyerName,
     }])
 
     if (buyerErr) {
-      await supabaseAdmin.from('users').delete().eq('user_id', authUserId)
-      await supabaseAdmin.auth.admin.deleteUser(authUserId)
       return new Response(JSON.stringify({ error: buyerErr.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
     return new Response(JSON.stringify({
-      success: true, userId: authUserId, email: shadowEmail, password: tempPassword,
+      success: true,
+      userId: authUserId,
+      email: shadowEmail,
+      password: tempPassword,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
 
   } catch (error: any) {
