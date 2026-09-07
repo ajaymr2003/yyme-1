@@ -1,7 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../core/contexts/AdminAuthContext';
-import { Plus, Edit2, Trash2, Eye, EyeOff, Save, GripVertical, Image } from 'lucide-react';
+import { getCached, setCached, invalidateCache } from '../../core/cache';
+import { Plus, Edit2, Trash2, Eye, EyeOff, Save, Image, X, Upload } from 'lucide-react';
 import { Banner } from '../../core/types';
+
+const CACHE_KEY = 'yyme_banners';
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+async function fetchFromDB(): Promise<Banner[]> {
+  const { data } = await supabase.from('banners').select('*').order('display_order');
+  return (data as any) ?? [];
+}
 
 export function BannerManager() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -13,11 +22,29 @@ export function BannerManager() {
   const [linkUrl, setLinkUrl] = useState('');
   const [displayOrder, setDisplayOrder] = useState('0');
   const [saving, setSaving] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [viewImage, setViewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function fetchBanners() {
+  async function fetchBanners(forceRefresh = false) {
+    if (!forceRefresh) {
+      const cached = getCached<Banner[]>(CACHE_KEY, CACHE_TTL_MS);
+      if (cached) {
+        setBanners(cached);
+        setLoading(false);
+        fetchFromDB().then(fresh => {
+          setCached(CACHE_KEY, fresh);
+          setBanners(fresh);
+        });
+        return;
+      }
+    }
+
     setLoading(true);
-    const { data } = await supabase.from('banners').select('*').order('display_order');
-    setBanners((data as any) ?? []);
+    const data = await fetchFromDB();
+    setCached(CACHE_KEY, data);
+    setBanners(data);
     setLoading(false);
   }
 
@@ -26,6 +53,7 @@ export function BannerManager() {
   function openAdd() {
     setEditingBanner(null);
     setTitle(''); setImageUrl(''); setLinkUrl(''); setDisplayOrder(String(banners.length));
+    setUploadFile(null); setUploadPreview(null);
     setShowAddModal(true);
   }
 
@@ -35,41 +63,78 @@ export function BannerManager() {
     setImageUrl(banner.image_url);
     setLinkUrl(banner.link_url ?? '');
     setDisplayOrder(String(banner.display_order));
+    setUploadFile(null); setUploadPreview(null);
     setShowAddModal(true);
   }
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be under 5MB');
+      return;
+    }
+    setUploadFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setUploadPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function uploadImage(): Promise<string | null> {
+    if (!uploadFile) return imageUrl.trim() || null;
+    const ext = uploadFile.name.split('.').pop() || 'jpg';
+    const filePath = `banners/${Date.now()}.${ext}`;
+    const { data, error } = await supabase.storage.from('payment-receipts').upload(filePath, uploadFile);
+    if (error || !data) return null;
+    const { data: urlData } = supabase.storage.from('payment-receipts').getPublicUrl(filePath);
+    return urlData.publicUrl;
+  }
+
   async function handleSave() {
-    if (!title.trim() || !imageUrl.trim()) return;
+    if (!title.trim()) return;
     setSaving(true);
+
+    const finalImageUrl = await uploadImage();
+    if (!finalImageUrl) {
+      setSaving(false);
+      return;
+    }
 
     if (editingBanner) {
       await supabase.from('banners').update({
-        title: title.trim(), image_url: imageUrl.trim(),
+        title: title.trim(), image_url: finalImageUrl,
         link_url: linkUrl.trim() || null, display_order: parseInt(displayOrder) || 0,
       }).eq('banner_id', editingBanner.banner_id);
     } else {
       await supabase.from('banners').insert([{
-        title: title.trim(), image_url: imageUrl.trim(),
+        title: title.trim(), image_url: finalImageUrl,
         link_url: linkUrl.trim() || null, display_order: parseInt(displayOrder) || 0,
         is_active: true,
       }]);
     }
 
     setShowAddModal(false);
-    fetchBanners();
+    invalidateCache(CACHE_KEY);
+    fetchBanners(true);
     setSaving(false);
   }
 
   async function toggleActive(banner: Banner) {
     await supabase.from('banners').update({ is_active: !banner.is_active }).eq('banner_id', banner.banner_id);
-    fetchBanners();
+    invalidateCache(CACHE_KEY);
+    fetchBanners(true);
   }
 
   async function handleDelete(bannerId: string) {
     if (!confirm('Delete this banner?')) return;
     await supabase.from('banners').delete().eq('banner_id', bannerId);
-    fetchBanners();
+    invalidateCache(CACHE_KEY);
+    fetchBanners(true);
   }
+
+  const hasChanges = editingBanner
+    ? title.trim() !== editingBanner.title || linkUrl.trim() !== (editingBanner.link_url ?? '') || String(displayOrder) !== String(editingBanner.display_order) || uploadFile !== null
+    : title.trim() !== '' || uploadFile !== null;
 
   return (
     <div className="space-y-4">
@@ -87,47 +152,70 @@ export function BannerManager() {
         <div className="text-center py-12">
           <Image className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
           <p className="text-sm font-medium text-neutral-600">No banners yet</p>
+          <p className="text-xs text-neutral-400 mt-1">Click "Add Banner" to create your first promotional banner</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {banners.map(banner => (
-            <div key={banner.banner_id} className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm">
-              <div className="flex gap-4">
-                <div className="w-32 h-20 bg-neutral-100 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
-                  {banner.image_url ? (
-                    <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
-                  ) : <Image className="w-6 h-6 text-neutral-300" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-sm font-semibold text-neutral-900">{banner.title}</h4>
-                      <p className="text-[10px] text-neutral-400 mt-0.5">Order: {banner.display_order} · {banner.is_active ? 'Active' : 'Inactive'}</p>
-                      {banner.link_url && (
-                        <p className="text-[10px] text-blue-600 mt-0.5 truncate">{banner.link_url}</p>
-                      )}
+        <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-sm">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-neutral-200 bg-neutral-50">
+                <th className="px-4 py-3 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Banner</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Order</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {banners.map(banner => (
+                <tr key={banner.banner_id} className="border-b border-neutral-100 last:border-0">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 h-14 bg-neutral-100 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center">
+                        {banner.image_url ? (
+                          <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
+                        ) : <Image className="w-5 h-5 text-neutral-300" />}
+                      </div>
+                      <p className="text-sm font-semibold text-neutral-900">{banner.title}</p>
                     </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-neutral-600">{banner.display_order}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => toggleActive(banner)}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors ${
+                        banner.is_active
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                          : 'bg-neutral-100 text-neutral-500 border border-neutral-200 hover:bg-neutral-200'
+                      }`}>
+                      {banner.is_active ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                      {banner.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-[10px] text-blue-600 max-w-[150px] truncate">
+                    {banner.link_url || '—'}
+                  </td>
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      <button onClick={() => toggleActive(banner)}
-                        className={`p-1.5 rounded-lg transition-colors ${banner.is_active ? 'text-emerald-600 hover:bg-emerald-50' : 'text-neutral-400 hover:bg-neutral-100'}`}>
-                        {banner.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                      </button>
                       <button onClick={() => openEdit(banner)}
-                        className="p-1.5 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="w-4 h-4" /></button>
+                        className="p-1.5 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                       <button onClick={() => handleDelete(banner.banner_id)}
-                        className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                        className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
+      {/* Add/Edit Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" onClick={() => !saving && setShowAddModal(false)} />
           <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full z-10 p-6">
             <h3 className="text-base font-semibold text-neutral-900 mb-4">{editingBanner ? 'Edit Banner' : 'Add Banner'}</h3>
             <div className="space-y-4">
@@ -137,18 +225,28 @@ export function BannerManager() {
                   className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="e.g., Summer Collection Sale" autoFocus />
               </div>
+
+              {/* Image Upload */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Image URL *</label>
-                <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="https://example.com/banner.jpg" />
+                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Banner Image *</label>
+                {uploadPreview ? (
+                  <div className="relative border border-neutral-200 rounded-lg overflow-hidden">
+                    <img src={uploadPreview} alt="Banner preview" className="w-full h-40 object-cover" />
+                    <button type="button" onClick={() => { setUploadFile(null); setUploadPreview(null); }}
+                      className="absolute top-2 right-2 p-1 bg-white/90 rounded-full shadow hover:bg-red-50 text-neutral-500 hover:text-red-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                    <label className="flex flex-col items-center gap-2 py-6 border-2 border-dashed border-neutral-300 rounded-lg cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors">
+                      <Upload className="w-8 h-8 text-neutral-400" />
+                      <span className="text-xs font-medium text-neutral-500">Click to upload banner image</span>
+                      <span className="text-[10px] text-neutral-400">JPG, PNG up to 5MB</span>
+                      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                    </label>
+                )}
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Link URL (optional)</label>
-                <input type="url" value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="https://yymee.com/sale" />
-              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Display Order</label>
                 <input type="number" value={displayOrder} onChange={e => setDisplayOrder(e.target.value)}
@@ -156,8 +254,9 @@ export function BannerManager() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-lg">Cancel</button>
-              <button onClick={handleSave} disabled={saving || !title.trim() || !imageUrl.trim()}
+              <button onClick={() => setShowAddModal(false)} disabled={saving}
+                className="px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 rounded-lg disabled:opacity-50">Cancel</button>
+              <button onClick={handleSave} disabled={saving || !title.trim() || (!uploadFile && !editingBanner)}
                 className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
                 <Save className="w-4 h-4" /> {saving ? 'Saving...' : editingBanner ? 'Save Changes' : 'Add Banner'}
               </button>

@@ -1,8 +1,8 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import { useSellerAuth } from '../core/contexts/SellerAuthContext';
 import { useQuota } from '../core/contexts/QuotaContext';
-import { LayoutDashboard, Package, CreditCard, LogOut, Zap, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Package, CreditCard, LogOut, Zap, BarChart3, User } from 'lucide-react';
 
 export function SellerLayout() {
   const { sellerProfile, signOut } = useSellerAuth();
@@ -23,15 +23,55 @@ export function SellerLayout() {
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
-          <a href="/" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-colors">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors ${
+                isActive
+                  ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-xs'
+                  : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 font-medium'
+              }`
+            }
+          >
             <LayoutDashboard className="w-4 h-4" /> Dashboard
-          </a>
-          <a href="/products" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-colors">
+          </NavLink>
+          <NavLink
+            to="/products"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors ${
+                isActive
+                  ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-xs'
+                  : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 font-medium'
+              }`
+            }
+          >
             <Package className="w-4 h-4" /> Products
-          </a>
-          <a href="/subscription" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg transition-colors">
+          </NavLink>
+          <NavLink
+            to="/subscription"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors ${
+                isActive
+                  ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-xs'
+                  : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 font-medium'
+              }`
+            }
+          >
             <CreditCard className="w-4 h-4" /> Subscription
-          </a>
+          </NavLink>
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors ${
+                isActive
+                  ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-xs'
+                  : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 font-medium'
+              }`
+            }
+          >
+            <User className="w-4 h-4" /> Profile
+          </NavLink>
         </nav>
 
         <div className="p-4 border-t border-neutral-100">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../core/contexts/AdminAuthContext';
+import { getCached, setCached, invalidateCache } from '../../core/cache';
 import { Category } from '../../core/types';
 import {
   ChevronDown,
@@ -20,63 +21,8 @@ interface CategoryFormData {
   level: number;
 }
 
-// ==========================================
-// Caching Layer (In-Memory + LocalStorage)
-// ==========================================
-const CACHE_KEY = 'yyme_categories_cache_v1';
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache TTL
-
-interface CachedData {
-  data: Category[];
-  timestamp: number;
-}
-
-let inMemoryCache: CachedData | null = null;
-
-function getCachedCategories(): Category[] | null {
-  // 1. Check in-memory cache first (sub-millisecond instant return)
-  if (inMemoryCache && Date.now() - inMemoryCache.timestamp < CACHE_TTL_MS) {
-    return inMemoryCache.data;
-  }
-
-  // 2. Fall back to localStorage for persistence across browser tabs/refreshes
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (raw) {
-      const parsed: CachedData = JSON.parse(raw);
-      if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
-        inMemoryCache = parsed;
-        return parsed.data;
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to read categories cache:', e);
-  }
-
-  return null;
-}
-
-function setCachedCategories(data: Category[]) {
-  const payload: CachedData = {
-    data,
-    timestamp: Date.now(),
-  };
-  inMemoryCache = payload;
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  } catch (e) {
-    console.warn('Failed to write categories cache:', e);
-  }
-}
-
-function invalidateCategoriesCache() {
-  inMemoryCache = null;
-  try {
-    localStorage.removeItem(CACHE_KEY);
-  } catch (e) {
-    // ignore
-  }
-}
+const CACHE_KEY = 'yyme_categories';
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 export function CategoryManager() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -121,7 +67,7 @@ export function CategoryManager() {
   const fetchCategories = async (forceRefresh = false) => {
     // 1. Instant Cache Hit Check
     if (!forceRefresh) {
-      const cached = getCachedCategories();
+      const cached = getCached<Category[]>(CACHE_KEY, CACHE_TTL_MS);
       if (cached && cached.length > 0) {
         setCategories(cached);
         setIsFromCache(true);
@@ -151,7 +97,7 @@ export function CategoryManager() {
 
       const fetchedCats = (data as Category[]) || [];
       setCategories(fetchedCats);
-      setCachedCategories(fetchedCats);
+      setCached(CACHE_KEY, fetchedCats);
       setIsFromCache(false);
       applyExpandedDefaults(fetchedCats);
 
@@ -178,7 +124,7 @@ export function CategoryManager() {
       if (!fetchErr && data) {
         const fetchedCats = data as Category[];
         setCategories(fetchedCats);
-        setCachedCategories(fetchedCats);
+        setCached(CACHE_KEY, fetchedCats);
         applyExpandedDefaults(fetchedCats);
       }
     } catch (e) {
@@ -294,7 +240,7 @@ export function CategoryManager() {
 
       setShowModal(false);
       showToast(isEditing ? 'Category updated successfully!' : 'Category created successfully!');
-      invalidateCategoriesCache();
+      invalidateCache(CACHE_KEY);
       await fetchCategories(true);
     } catch (err: any) {
       setError(err.message || 'Failed to save category');
@@ -322,7 +268,7 @@ export function CategoryManager() {
       }
 
       showToast('Category deleted successfully.');
-      invalidateCategoriesCache();
+      invalidateCache(CACHE_KEY);
       await fetchCategories(true);
     } catch (err: any) {
       setError(err.message || 'Failed to delete category');

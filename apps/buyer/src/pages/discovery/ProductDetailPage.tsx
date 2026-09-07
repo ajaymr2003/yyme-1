@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../core/contexts/AuthContext';
-import { useCart } from '../../core/contexts/CartContext';
+import { useCart, formatWhatsAppUrl } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import {
   ShoppingCart,
@@ -18,6 +18,7 @@ import {
   Minus,
   Share2,
 } from 'lucide-react';
+import { SimilarProducts } from './SimilarProducts';
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -52,6 +53,8 @@ export function ProductDetailPage() {
               .from('products')
               .select('*, seller:sellers(business_name), category:categories(name)')
               .eq('category_id', data.category_id)
+              .eq('is_active', true)
+              .eq('qc_status', 'verified')
               .neq('product_id', data.product_id)
               .limit(4)
               .then(({ data: related }) => setRelatedProducts(related || []));
@@ -102,16 +105,32 @@ export function ProductDetailPage() {
 
   const minOrder = product.moq || 1;
 
-  const handleAddToCart = () => {
-    for (let i = 0; i < quantity; i++) {
-      addItem(product);
+  const handleAddToCart = async () => {
+    const success = await addItem(product, undefined, quantity);
+    if (success) {
+      showToast(`Added ${quantity} item${quantity > 1 ? 's' : ''} to cart!`);
     }
-    showToast(`Added ${quantity} item${quantity > 1 ? 's' : ''} to cart!`);
   };
 
-  const whatsappMessage = encodeURIComponent(
-    `Hello ${product.seller?.business_name || 'Seller'}, I am interested in purchasing "${product.name}" (Qty: ${quantity}, Total: ${formatINR(product.base_price * quantity)}) on YYME. Can you share availability and payment details?`
-  );
+  const whatsappMessage = `Hello ${product.seller?.business_name || 'Seller'}, I am interested in purchasing "${product.name}" (Qty: ${quantity}, Total: ${formatINR(product.base_price * quantity)}) on YYME. Can you share availability and payment details?`;
+
+  const handleWhatsAppClick = () => {
+    if (!product?.seller_id) return;
+
+    // 1. Decrement seller's remaining_click_quota via database RPC function
+    supabase.rpc('decrement_click_quota', { sid: product.seller_id }).then(({ error }) => {
+      if (error) console.error('Error decrementing click quota:', error);
+    });
+
+    // 2. Log click into whatsapp_click_logs
+    supabase.from('whatsapp_click_logs').insert([{
+      seller_id: product.seller_id,
+      product_id: product.product_id,
+      item_price: product.base_price
+    }]).then(({ error }) => {
+      if (error) console.warn('whatsapp_click_logs note:', error.message);
+    });
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8 pb-16">
@@ -280,14 +299,26 @@ export function ProductDetailPage() {
             </button>
 
             {product.seller?.whatsapp_number && (
-              <a
-                href={`https://wa.me/91${product.seller.whatsapp_number}?text=${whatsappMessage}`}
-                target="_blank"
-                rel="noreferrer"
-                className="py-3 px-5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
-              >
-                <MessageCircle className="w-4 h-4" /> Order on WhatsApp
-              </a>
+              product.seller.remaining_click_quota !== undefined && product.seller.remaining_click_quota <= 0 ? (
+                <button
+                  type="button"
+                  disabled
+                  className="py-3 px-5 bg-neutral-200 text-neutral-500 text-sm font-bold rounded-xl cursor-not-allowed flex items-center justify-center gap-2"
+                  title="Seller inquiry quota reached"
+                >
+                  <MessageCircle className="w-4 h-4" /> Inquiries Full
+                </button>
+              ) : (
+                <a
+                  href={formatWhatsAppUrl(product.seller.whatsapp_number, whatsappMessage)}
+                  onClick={handleWhatsAppClick}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="py-3 px-5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4" /> Order on WhatsApp
+                </a>
+              )
             )}
           </div>
 
@@ -332,46 +363,7 @@ export function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Recommended Products */}
-      {relatedProducts.length > 0 && (
-        <section className="space-y-4 pt-6 border-t border-neutral-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-neutral-900">More in this Category</h2>
-              <p className="text-xs text-neutral-500">Other authentic picks you might like</p>
-            </div>
-            <Link to="/shop" className="text-xs font-semibold text-emerald-700 hover:underline">
-              View Shop
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            {relatedProducts.map((p) => (
-              <Link
-                key={p.product_id}
-                to={`/product/${p.product_id}`}
-                className="bg-white border border-neutral-200 rounded-xl p-3 shadow-xs hover:shadow-md transition-all group block"
-              >
-                <div className="aspect-square bg-neutral-100 rounded-lg overflow-hidden mb-2">
-                  {p.image_urls?.[0] ? (
-                    <img
-                      src={p.image_urls[0]}
-                      alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
-                  )}
-                </div>
-                <h4 className="text-xs font-bold text-neutral-900 line-clamp-1 group-hover:text-emerald-700">
-                  {p.name}
-                </h4>
-                <p className="text-xs font-black text-neutral-900 mt-1">{formatINR(p.base_price)}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      <SimilarProducts products={relatedProducts} />
     </div>
   );
 }

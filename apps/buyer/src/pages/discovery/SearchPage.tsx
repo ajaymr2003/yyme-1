@@ -12,8 +12,17 @@ export function SearchPage() {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const { addItem } = useCart();
   const navigate = useNavigate();
+
+  const handleAdd = async (product: any) => {
+    const success = await addItem(product);
+    if (success) {
+      setToastMessage(`Added "${product.name}" to cart!`);
+      setTimeout(() => setToastMessage(null), 2500);
+    }
+  };
 
   async function doSearch(searchTerm?: string) {
     const term = searchTerm !== undefined ? searchTerm : query;
@@ -22,8 +31,9 @@ export function SearchPage() {
     setSearched(true);
     const { data } = await supabase
       .from('products')
-      .select('*, seller:sellers(business_name, whatsapp_number), category:categories(name)')
+      .select('*, seller:sellers(seller_id, business_name, whatsapp_number, remaining_click_quota), category:categories(name)')
       .eq('is_active', true)
+      .eq('qc_status', 'verified')
       .ilike('name', `%${term.trim()}%`)
       .order('created_at', { ascending: false });
     setResults(data ?? []);
@@ -78,14 +88,21 @@ export function SearchPage() {
                 <p className="text-[10px] text-neutral-500">{product.seller?.business_name}</p>
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-sm font-bold text-neutral-900">{formatINR(product.base_price)}</span>
-                  <button onClick={() => addItem(product)}
-                    className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-sm">
+                  <button onClick={() => handleAdd(product)}
+                    className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer">
                     <ShoppingCart className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 bg-neutral-900/95 backdrop-blur-xs text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

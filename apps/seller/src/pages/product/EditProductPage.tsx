@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSellerAuth, supabase } from '../../core/contexts/SellerAuthContext';
-import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, AlertTriangle, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 interface VariantDraft {
   variant_id?: string;
@@ -26,7 +26,6 @@ export function EditProductPage() {
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [material, setMaterial] = useState('');
-  const [weightKg, setWeightKg] = useState('0.5');
   const [moq, setMoq] = useState('1');
   const [basePrice, setBasePrice] = useState('');
   const [mrp, setMrp] = useState('');
@@ -35,6 +34,8 @@ export function EditProductPage() {
   const [variants, setVariants] = useState<VariantDraft[]>([]);
   const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [status, setStatus] = useState<'active' | 'inactive' | 'revoked'>('active');
+  const [qcStatus, setQcStatus] = useState<'submitted' | 'verified' | 'rejected'>('submitted');
 
   useEffect(() => {
     supabase.from('categories').select('*').eq('level', 1).order('display_order').then(({ data }) => setCategories(data ?? []));
@@ -47,7 +48,6 @@ export function EditProductPage() {
         setCategoryId(data.category_id);
         setDescription(data.description ?? '');
         setMaterial(data.material ?? '');
-        setWeightKg(String(data.weight_kg ?? 0.5));
         setMoq(String(data.moq ?? 1));
         setBasePrice(String(data.base_price));
         setMrp(String(data.mrp ?? ''));
@@ -55,6 +55,8 @@ export function EditProductPage() {
         setHaveVariants(data.have_variants);
         setImageUrl(data.image_urls?.[0] ?? '');
         setIsActive(data.is_active);
+        setStatus(data.status || (data.is_active ? 'active' : 'inactive'));
+        setQcStatus(data.qc_status || 'submitted');
         setVariants((data.product_variants ?? []).map((v: any) => ({
           variant_id: v.variant_id, id: v.variant_id,
           variant_type: v.variant_type, variant_value: v.variant_value,
@@ -78,14 +80,23 @@ export function EditProductPage() {
     setSaving(true);
     setError('');
 
-    const { error: prodErr } = await supabase.from('products').update({
+    const updatePayload: any = {
       name: name.trim(), category_id: categoryId, description: description.trim() || null,
-      material: material.trim() || null, weight_kg: parseFloat(weightKg) || 0.5,
+      material: material.trim() || null, weight_kg: 0.5,
       moq: parseInt(moq) || 1, base_price: parseFloat(basePrice),
       mrp: parseFloat(mrp) || parseFloat(basePrice),
       stock_quantity: parseInt(stockQuantity) || 0, have_variants: haveVariants,
-      image_urls: imageUrl ? [imageUrl] : [], is_active: isActive,
-    }).eq('product_id', productId);
+      image_urls: imageUrl ? [imageUrl] : [],
+      is_active: status === 'active',
+      status: status
+    };
+
+    let { error: prodErr } = await supabase.from('products').update(updatePayload).eq('product_id', productId);
+    if (prodErr && prodErr.message?.includes('status')) {
+      delete updatePayload.status;
+      const retry = await supabase.from('products').update(updatePayload).eq('product_id', productId);
+      prodErr = retry.error;
+    }
 
     if (prodErr) { setError(prodErr.message); setSaving(false); return; }
 
@@ -116,13 +127,99 @@ export function EditProductPage() {
   if (loading) return <div className="text-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto" /></div>;
 
   return (
-    <div className="max-w-2xl mx-auto pb-20">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate(-1)} className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg"><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="text-xl font-bold text-neutral-900">Edit Product</h1>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <button type="button" onClick={() => navigate('/products')}
+          className="p-2 hover:bg-neutral-100 rounded-xl transition-colors cursor-pointer">
+          <ArrowLeft className="w-5 h-5 text-neutral-600" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Edit Product Listing</h1>
+          <p className="text-xs text-neutral-500">Update product specifications, inventory status, and variants</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Status & QC Verification Box */}
+        <div className="bg-white border border-neutral-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-100">
+            <div>
+              <span className="text-xs font-bold text-neutral-800 block">Product Status</span>
+              <p className="text-[11px] text-neutral-500 mt-0.5">
+                Manage inventory visibility and publication status.
+              </p>
+            </div>
+
+            {status === 'revoked' ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-black">
+                <XCircle className="w-4 h-4" />
+                <span>Revoked by Admin</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => { setStatus('active'); setIsActive(true); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    status === 'active'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStatus('inactive'); setIsActive(false); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    status === 'inactive'
+                      ? 'bg-neutral-700 text-white shadow-xs'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  Inactive
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* QC Status banner */}
+          <div className={`flex items-start gap-3 rounded-xl p-3 text-xs border ${
+            qcStatus === 'verified'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : qcStatus === 'rejected'
+              ? 'bg-rose-50 border-rose-200 text-rose-900'
+              : 'bg-amber-50 border-amber-200 text-amber-900'
+          }`}>
+            {qcStatus === 'verified' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            ) : qcStatus === 'rejected' ? (
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            ) : (
+              <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold">Quality Check (QC) Status:</span>
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                  qcStatus === 'verified'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : qcStatus === 'rejected'
+                    ? 'bg-rose-100 text-rose-800 border-rose-300'
+                    : 'bg-amber-100 text-amber-800 border-amber-300'
+                }`}>
+                  {qcStatus}
+                </span>
+              </div>
+              <p className="text-[11px] mt-1 opacity-90">
+                {qcStatus === 'verified' && 'This product has been verified by quality administrators and is approved for sale.'}
+                {qcStatus === 'rejected' && 'Quality administrators rejected this listing. Please review the details, update accordingly, and contact admin.'}
+                {qcStatus === 'submitted' && 'This product is submitted and waiting for administrator quality verification.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-bold text-neutral-900">Basic Information</h3>
           <div>
@@ -143,17 +240,10 @@ export function EditProductPage() {
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Material</label>
-              <input type="text" value={material} onChange={e => setMaterial(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Weight (kg)</label>
-              <input type="number" step="0.1" value={weightKg} onChange={e => setWeightKg(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Material</label>
+            <input type="text" value={material} onChange={e => setMaterial(e.target.value)}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
         </div>
 
@@ -183,11 +273,6 @@ export function EditProductPage() {
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)}
-              className="w-4 h-4 text-emerald-600 border-neutral-300 rounded focus:ring-emerald-500" />
-            <span className="text-xs font-medium text-neutral-600">Product is active (visible to buyers)</span>
-          </label>
         </div>
 
         <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4">

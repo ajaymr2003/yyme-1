@@ -2,10 +2,10 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart, CartItemRow } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
-import { Trash2, Plus, Minus, ShoppingCart, MessageCircle } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, MessageCircle, Store, ShieldCheck } from 'lucide-react';
 
 export function CartPage() {
-  const { items, summary, loading, fetchCart, removeItem, incrementQty, decrementQty, clearCart } = useCart();
+  const { items, summary, currentSeller, loading, fetchCart, removeItem, incrementQty, decrementQty, clearCart, handleWhatsAppOrderClick } = useCart();
   const navigate = useNavigate();
 
   useEffect(() => { fetchCart(); }, []);
@@ -20,23 +20,50 @@ export function CartPage() {
       <h2 className="text-lg font-bold text-neutral-900">Your cart is empty</h2>
       <p className="text-sm text-neutral-500 mt-1">Browse products and add items to your cart</p>
       <button onClick={() => navigate('/shop')}
-        className="mt-4 px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors">
+        className="mt-4 px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors cursor-pointer">
         Browse Shop
       </button>
     </div>
   );
 
+  const sellerName = currentSeller?.business_name || summary.seller?.business_name || 'Verified Artisan';
+  const isQuotaReached = summary.seller?.remaining_click_quota !== undefined && summary.seller.remaining_click_quota <= 0;
+
   return (
-    <div className="px-4 py-4 pb-32">
-      <div className="flex items-center justify-between mb-4">
+    <div className="px-4 py-4 pb-32 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-3">
         <h1 className="text-lg font-bold text-neutral-900">Cart ({items.length})</h1>
-        <button onClick={clearCart} className="text-xs text-red-600 font-medium hover:underline">Clear All</button>
+        <button onClick={clearCart} className="text-xs text-red-600 font-medium hover:underline cursor-pointer">
+          Clear All
+        </button>
+      </div>
+
+      {/* Seller Header Banner */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-3.5 mb-3 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
+              <Store className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-neutral-500">Ordering from:</span>
+                <span className="text-xs font-bold text-neutral-900">{sellerName}</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <p className="text-[11px] text-neutral-400">Direct fulfillment with maker</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            Single Seller
+          </span>
+        </div>
       </div>
 
       {/* Single seller enforcement notice */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4">
-        <p className="text-xs text-amber-700 font-medium">
-          ⚠️ Cart supports items from <strong>one seller at a time</strong>. Adding from a different seller will replace current items.
+        <p className="text-xs text-amber-800 font-medium leading-relaxed">
+          ⚡ <strong>Single-Seller Policy:</strong> Orders are coordinated directly via WhatsApp with this seller. Adding items from another maker will prompt you to replace this cart.
         </p>
       </div>
 
@@ -51,15 +78,34 @@ export function CartPage() {
 
       {/* Sticky Checkout Bar */}
       <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-neutral-200 px-4 py-3 z-30">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-neutral-600">Total</span>
-          <span className="text-lg font-bold text-neutral-900">{formatINR(summary.displayPrice)}</span>
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-neutral-600">Total</span>
+            <span className="text-lg font-bold text-neutral-900">{formatINR(summary.displayPrice)}</span>
+          </div>
+
+          {isQuotaReached ? (
+            <button
+              disabled
+              className="w-full bg-neutral-200 text-neutral-500 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+              title="Seller inquiry quota reached for this billing cycle"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Seller Inquiries Full
+            </button>
+          ) : (
+            <a
+              href={summary.whatsappLink}
+              onClick={handleWhatsAppOrderClick}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Order via WhatsApp
+            </a>
+          )}
         </div>
-        <a href={summary.whatsappLink} target="_blank" rel="noopener noreferrer"
-          className="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-lg">
-          <MessageCircle className="w-5 h-5" />
-          Order via WhatsApp
-        </a>
       </div>
     </div>
   );

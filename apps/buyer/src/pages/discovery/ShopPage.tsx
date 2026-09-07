@@ -13,7 +13,16 @@ export function ShopPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(categoryId ?? null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const { addItem } = useCart();
+
+  const handleAdd = async (product: any) => {
+    const success = await addItem(product);
+    if (success) {
+      setToastMessage(`Added "${product.name}" to cart!`);
+      setTimeout(() => setToastMessage(null), 2500);
+    }
+  };
 
   useEffect(() => {
     supabase.from('categories').select('*').eq('level', 1).order('display_order').then(({ data }) => setCategories(data ?? []));
@@ -28,7 +37,11 @@ export function ShopPage() {
 
   useEffect(() => {
     setLoading(true);
-    let query = supabase.from('products').select('*, seller:sellers(business_name), category:categories(name)').eq('is_active', true);
+    let query = supabase
+      .from('products')
+      .select('*, seller:sellers(seller_id, business_name, whatsapp_number, remaining_click_quota), category:categories(name)')
+      .eq('is_active', true)
+      .eq('qc_status', 'verified');
     if (subCategoryId) query = query.eq('category_id', subCategoryId);
     else if (categoryId) query = query.eq('category_id', categoryId);
     query.order('created_at', { ascending: false }).then(({ data }) => {
@@ -106,8 +119,8 @@ export function ShopPage() {
                 <p className="text-[10px] text-neutral-500 mt-0.5">by {product.seller?.business_name}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-base font-bold text-neutral-900">{formatINR(product.base_price)}</span>
-                  <button onClick={() => addItem(product)}
-                    className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-sm">
+                  <button onClick={() => handleAdd(product)}
+                    className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer">
                     <ShoppingCart className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -132,14 +145,21 @@ export function ShopPage() {
                 <p className="text-[10px] text-neutral-500">{product.seller?.business_name}</p>
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-sm font-bold text-neutral-900">{formatINR(product.base_price)}</span>
-                  <button onClick={() => addItem(product)}
-                    className="px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors">
+                  <button onClick={() => handleAdd(product)}
+                    className="px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer">
                     Add to Cart
                   </button>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 bg-neutral-900/95 backdrop-blur-xs text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

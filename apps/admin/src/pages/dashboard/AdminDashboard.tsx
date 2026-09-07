@@ -1,34 +1,62 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../core/contexts/AdminAuthContext';
+import { getCached, setCached } from '../../core/cache';
 import { ShieldCheck, Users, Package, Zap, TrendingUp, BarChart3 } from 'lucide-react';
 
+const CACHE_KEY = 'yyme_dashboard_stats';
+const CACHE_TTL_MS = 2 * 60 * 1000;
+
+interface DashboardStats {
+  totalSellers: number;
+  pendingVerifications: number;
+  activeSellers: number;
+  totalProducts: number;
+  totalClicks: number;
+  pendingUpgrades: number;
+}
+
+async function fetchStatsFromDB(): Promise<DashboardStats> {
+  const [sellers, pending, active, products, clicks, upgrades] = await Promise.all([
+    supabase.from('sellers').select('seller_id', { count: 'exact', head: true }),
+    supabase.from('seller_verifications').select('record_id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('sellers').select('seller_id', { count: 'exact', head: true }).eq('account_status', 'active'),
+    supabase.from('products').select('product_id', { count: 'exact', head: true }),
+    supabase.from('whatsapp_click_logs').select('log_id', { count: 'exact', head: true }),
+    supabase.from('subscription_upgrade_requests').select('request_id', { count: 'exact', head: true }).eq('status', 'pending_approval'),
+  ]);
+
+  return {
+    totalSellers: sellers.count ?? 0,
+    pendingVerifications: pending.count ?? 0,
+    activeSellers: active.count ?? 0,
+    totalProducts: products.count ?? 0,
+    totalClicks: clicks.count ?? 0,
+    pendingUpgrades: upgrades.count ?? 0,
+  };
+}
+
 export function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalSellers: 0, pendingVerifications: 0, activeSellers: 0,
     totalProducts: 0, totalClicks: 0, pendingUpgrades: 0,
   });
 
   useEffect(() => {
-    async function fetchStats() {
-      const [sellers, pending, active, products, clicks, upgrades] = await Promise.all([
-        supabase.from('sellers').select('seller_id', { count: 'exact', head: true }),
-        supabase.from('seller_verifications').select('record_id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('sellers').select('seller_id', { count: 'exact', head: true }).eq('account_status', 'active'),
-        supabase.from('products').select('product_id', { count: 'exact', head: true }),
-        supabase.from('whatsapp_click_logs').select('log_id', { count: 'exact', head: true }),
-        supabase.from('subscription_upgrade_requests').select('request_id', { count: 'exact', head: true }).eq('status', 'pending_approval'),
-      ]);
-
-      setStats({
-        totalSellers: sellers.count ?? 0,
-        pendingVerifications: pending.count ?? 0,
-        activeSellers: active.count ?? 0,
-        totalProducts: products.count ?? 0,
-        totalClicks: clicks.count ?? 0,
-        pendingUpgrades: upgrades.count ?? 0,
+    const cached = getCached<DashboardStats>(CACHE_KEY, CACHE_TTL_MS);
+    if (cached) {
+      setStats(cached);
+      // Stale-while-revalidate: refresh silently in background
+      fetchStatsFromDB().then(fresh => {
+        setCached(CACHE_KEY, fresh);
+        setStats(fresh);
       });
+      return;
     }
-    fetchStats();
+
+    fetchStatsFromDB().then(fresh => {
+      setCached(CACHE_KEY, fresh);
+      setStats(fresh);
+    });
   }, []);
 
   return (

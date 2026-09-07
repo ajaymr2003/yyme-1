@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../core/contexts/AuthContext';
-import { useCart } from '../../core/contexts/CartContext';
+import { useCart, formatWhatsAppUrl } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import {
   ShoppingCart,
@@ -111,6 +111,7 @@ export function HomePage() {
 
   const [banners, setBanners] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [allCategories, setAllCategories] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'trending' | 'new' | 'best'>('trending');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -133,26 +134,36 @@ export function HomePage() {
     supabase
       .from('categories')
       .select('*')
-      .eq('level', 1)
       .order('display_order')
-      .then(({ data }) => setCategories(data ?? []));
+      .then(({ data }) => {
+        const catList = data ?? [];
+        setAllCategories(catList);
+        setCategories(catList.filter((c: any) => c.level === 1));
+      });
 
-    // 3. Products with seller and category joins
+    // 3. Products with seller and category joins (only QC verified and active)
     supabase
       .from('products')
-      .select('*, seller:sellers(seller_id, business_name, shipping_state, whatsapp_number), category:categories(name)')
+      .select('*, seller:sellers(seller_id, business_name, whatsapp_number, remaining_click_quota), category:categories(name)')
       .eq('is_active', true)
+      .eq('qc_status', 'verified')
       .order('created_at', { ascending: false })
       .limit(24)
-      .then(({ data }) => setAllProducts(data ?? []));
+      .then(({ data, error }) => {
+        if (error) console.error('Error fetching products:', error);
+        setAllProducts(data ?? []);
+      });
 
     // 4. Active Verified Sellers
     supabase
       .from('sellers')
-      .select('seller_id, business_name, seller_type, shipping_state, account_status')
+      .select('seller_id, business_name, account_status')
       .eq('account_status', 'active')
       .limit(6)
-      .then(({ data }) => setSellers(data ?? []));
+      .then(({ data, error }) => {
+        if (error) console.error('Error fetching sellers:', error);
+        setSellers(data ?? []);
+      });
   }, []);
 
   // Hero carousel auto-timer
@@ -169,12 +180,38 @@ export function HomePage() {
     setTimeout(() => setAddedToast(null), 2500);
   };
 
-  // Filter products by active tab and optional category
+  const handleWhatsAppClick = (sellerId: string, productId: string, itemPrice: number) => {
+    if (!sellerId) return;
+
+    // Decrement click quota for seller in database
+    supabase.rpc('decrement_click_quota', { sid: sellerId }).then(({ error }) => {
+      if (error) console.error('Error decrementing click quota:', error);
+    });
+
+    // Log click event
+    supabase.from('whatsapp_click_logs').insert([{
+      seller_id: sellerId,
+      product_id: productId,
+      item_price: itemPrice
+    }]).then(({ error }) => {
+      if (error) console.warn('whatsapp_click_logs note:', error.message);
+    });
+  };
+
+  // Filter products by active tab and optional category (including child categories)
   const filteredProducts = allProducts.filter((p) => {
-    if (selectedCategory && p.category_id !== selectedCategory) {
-      return false;
-    }
-    return true;
+    if (!selectedCategory) return true;
+    if (p.category_id === selectedCategory) return true;
+
+    // Check if product's category is a child/descendant of the selected category
+    const isDescendant = (catId: string, targetId: string): boolean => {
+      const cat = allCategories.find((c: any) => c.category_id === catId);
+      if (!cat || !cat.parent_category_id) return false;
+      if (cat.parent_category_id === targetId) return true;
+      return isDescendant(cat.parent_category_id, targetId);
+    };
+
+    return isDescendant(p.category_id, selectedCategory);
   });
 
   const getTabProducts = () => {
@@ -508,9 +545,9 @@ export function HomePage() {
                       <div>
                         <div className="flex items-center justify-between gap-1 text-[10px] text-emerald-700 font-bold uppercase tracking-wider mb-1">
                           <span className="truncate">{p.category?.name || 'Handicraft'}</span>
-                          {p.seller?.shipping_state && (
+                          {p.seller?.business_name && (
                             <span className="text-neutral-400 font-normal truncate">
-                              {p.seller.shipping_state}
+                              {p.seller.business_name}
                             </span>
                           )}
                         </div>
@@ -541,11 +578,13 @@ export function HomePage() {
 
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => {
-                              addItem(p);
-                              showAddedToast(p.name);
+                            onClick={async () => {
+                              const success = await addItem(p);
+                              if (success) {
+                                showAddedToast(p.name);
+                              }
                             }}
-                            className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                            className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                           >
                             <ShoppingCart className="w-3.5 h-3.5" />
                             Add to Cart
@@ -553,12 +592,14 @@ export function HomePage() {
 
                           {p.seller?.whatsapp_number && (
                             <a
-                              href={`https://wa.me/91${p.seller.whatsapp_number}?text=${encodeURIComponent(
+                              href={formatWhatsAppUrl(
+                                p.seller.whatsapp_number,
                                 `Hi ${p.seller.business_name}, I saw "${p.name}" on YYME and want to order it!`
-                              )}`}
+                              )}
+                              onClick={() => handleWhatsAppClick(p.seller_id, p.product_id, p.base_price)}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-2 border border-neutral-200 hover:border-emerald-500 hover:bg-emerald-50 text-emerald-700 rounded-lg transition-colors"
+                              className="p-2 border border-neutral-200 hover:border-emerald-500 hover:bg-emerald-50 text-emerald-700 rounded-lg transition-colors cursor-pointer"
                               title="Chat with Maker on WhatsApp"
                             >
                               <MessageCircle className="w-4 h-4" />

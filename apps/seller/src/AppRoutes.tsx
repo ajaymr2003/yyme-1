@@ -10,6 +10,7 @@ import { ProductsPage } from './pages/dashboard/ProductsPage';
 import { AddProductPage } from './pages/product/AddProductPage';
 import { EditProductPage } from './pages/product/EditProductPage';
 import { SubscriptionPage } from './pages/subscription/SubscriptionPage';
+import { ProfilePage } from './pages/profile/ProfilePage';
 
 export function AppRoutes() {
   const { session, sellerProfile, loading } = useSellerAuth();
@@ -55,6 +56,7 @@ export function AppRoutes() {
         <Route path="/products/add" element={<AddProductPage />} />
         <Route path="/products/edit/:productId" element={<EditProductPage />} />
         <Route path="/subscription" element={<SubscriptionPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

@@ -38,7 +38,6 @@ CREATE TABLE public.sellers (
   business_name varchar NOT NULL,
   owner_name varchar NOT NULL,
   whatsapp_number varchar NOT NULL,
-  seller_type varchar NOT NULL DEFAULT 'standard',
   account_status varchar NOT NULL DEFAULT 'pending_verification'
     CHECK (account_status IN ('pending_verification', 'active', 'rejected', 'frozen', 'suspended')),
   is_gst_registered boolean NOT NULL DEFAULT false,
@@ -146,6 +145,8 @@ CREATE TABLE public.products (
   have_variants boolean NOT NULL DEFAULT false,
   image_urls text[] DEFAULT '{}'::text[],
   is_active boolean NOT NULL DEFAULT true,
+  qc_status varchar NOT NULL DEFAULT 'submitted' CHECK (qc_status IN ('submitted', 'verified', 'rejected')),
+  status varchar NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'revoked')),
   created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -284,9 +285,8 @@ CREATE POLICY "auth_all_cart_items" ON public.cart_items FOR ALL TO authenticate
 CREATE POLICY "auth_all_whatsapp_logs" ON public.whatsapp_click_logs FOR ALL TO authenticated USING (true);
 CREATE POLICY "auth_all_audit_logs" ON public.audit_logs FOR ALL TO authenticated USING (true);
 CREATE POLICY "auth_all_seller_verifications" ON public.seller_verifications FOR ALL TO authenticated USING (true);
-CREATE POLICY "auth_all_upgrade_requests" ON public.subscription_upgrade_requests FOR ALL TO authenticated USING (true);
-CREATE POLICY "auth_all_products" ON public.products FOR ALL TO authenticated USING (true);
-CREATE POLICY "auth_all_product_variants" ON public.product_variants FOR ALL TO authenticated USING (true);
+CREATE POLICY "allow_all_products" ON public.products FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_product_variants" ON public.product_variants FOR ALL TO public USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all_banners" ON public.banners FOR ALL TO authenticated USING (true);
 CREATE POLICY "allow_all_categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
 

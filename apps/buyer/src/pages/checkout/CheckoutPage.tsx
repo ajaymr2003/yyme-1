@@ -1,10 +1,10 @@
 import React from 'react';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
-import { MessageCircle, MapPin, Shield, CheckCircle } from 'lucide-react';
+import { MessageCircle, MapPin, Store, ShieldCheck } from 'lucide-react';
 
 export function CheckoutPage() {
-  const { items, summary } = useCart();
+  const { items, summary, currentSeller, handleWhatsAppOrderClick } = useCart();
 
   if (items.length === 0) {
     return (
@@ -14,9 +14,29 @@ export function CheckoutPage() {
     );
   }
 
+  const sellerName = currentSeller?.business_name || summary.seller?.business_name || 'Verified Artisan';
+  const isQuotaReached = summary.seller?.remaining_click_quota !== undefined && summary.seller.remaining_click_quota <= 0;
+
   return (
-    <div className="px-4 py-4 pb-32">
-      <h1 className="text-lg font-bold text-neutral-900 mb-4">Order Summary</h1>
+    <div className="px-4 py-4 pb-32 max-w-2xl mx-auto">
+      <h1 className="text-lg font-bold text-neutral-900 mb-3">Order Summary</h1>
+
+      {/* Seller Header */}
+      <div className="bg-white border border-neutral-200 rounded-xl p-3.5 mb-4 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
+            <Store className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-neutral-500">Seller:</span>
+              <span className="text-xs font-bold text-neutral-900">{sellerName}</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+            <p className="text-[11px] text-neutral-400">Direct fulfillment with maker</p>
+          </div>
+        </div>
+      </div>
 
       {/* Order Items */}
       <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden mb-4">
@@ -84,11 +104,29 @@ export function CheckoutPage() {
 
       {/* Action */}
       <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-neutral-200 px-4 py-3 z-30">
-        <a href={summary.whatsappLink} target="_blank" rel="noopener noreferrer"
-          className="w-full bg-emerald-600 text-white py-3.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-lg">
-          <MessageCircle className="w-5 h-5" />
-          Order via WhatsApp — {formatINR(summary.displayPrice)}
-        </a>
+        <div className="max-w-2xl mx-auto">
+          {isQuotaReached ? (
+            <button
+              disabled
+              className="w-full bg-neutral-200 text-neutral-500 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed"
+              title="Seller inquiry quota reached for this billing cycle"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Seller Inquiries Full
+            </button>
+          ) : (
+            <a
+              href={summary.whatsappLink}
+              onClick={handleWhatsAppOrderClick}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-emerald-600 text-white py-3.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+            >
+              <MessageCircle className="w-5 h-5" />
+              Order via WhatsApp — {formatINR(summary.displayPrice)}
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
