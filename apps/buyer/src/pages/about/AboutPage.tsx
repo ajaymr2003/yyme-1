@@ -4,9 +4,9 @@ import { Heart, Shield, Users, MapPin, ArrowRight, Sparkles } from 'lucide-react
 
 export function AboutPage() {
   return (
-    <div className="bg-[#f8faf9]">
+    <div className="bg-surface-page">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-[#004D35] to-emerald-700 text-white">
+      <section className="bg-gradient-to-br from-brand-800 to-brand-700 text-white">
         <div className="max-w-5xl mx-auto px-4 py-12 md:py-20">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
@@ -22,7 +22,7 @@ export function AboutPage() {
               </p>
               <Link
                 to="/shop"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white text-[#004D35] text-sm font-bold rounded-xl shadow-md hover:bg-emerald-50 transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white text-brand-800 text-sm font-bold rounded-xl shadow-md hover:bg-emerald-50 transition-colors"
               >
                 Shop & Support Now <ArrowRight className="w-4 h-4" />
               </Link>

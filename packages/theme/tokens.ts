@@ -1,0 +1,30 @@
+export const themeTokens = {
+  colors: {
+    primary: '#00b33b',
+    primaryHover: '#009932',
+    primaryDark: '#00802a',
+    primaryLight: '#b3ffd0',
+    background: '#FFFFFF',
+    surface: '#FAFAFA',
+    surfacePage: '#f8faf9',
+    surfaceWarm: '#f1f2f4',
+    surfaceInput: '#f1f3f5',
+    surfaceCategory: '#f0f2f5',
+    surfaceBody: '#f5f5f4',
+    border: '#E5E5E5',
+    textPrimary: '#111111',
+    textSecondary: '#6B7280',
+    textMuted: '#9CA3AF',
+    success: '#00b33b',
+    warning: '#D97706',
+    error: '#DC2626',
+    iconAccent: '#00a838',
+    iconOutline: '#2B2D42',
+    iconOutlineLight: '#E5E7EB',
+    iconSvg: '#333333',
+  },
+  radius: '8px',
+  fontFamily: 'Inter, system-ui, sans-serif',
+};
+
+export type ThemeTokens = typeof themeTokens;

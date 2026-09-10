@@ -141,7 +141,7 @@ CREATE TABLE public.products (
   moq integer NOT NULL DEFAULT 1 CHECK (moq >= 1),
   base_price numeric NOT NULL CHECK (base_price >= 0.00),
   mrp numeric NOT NULL DEFAULT 0.00 CHECK (mrp >= 0.00),
-  stock_quantity integer NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+  stock_quantity boolean NOT NULL DEFAULT true,
   have_variants boolean NOT NULL DEFAULT false,
   image_urls text[] DEFAULT '{}'::text[],
   is_active boolean NOT NULL DEFAULT true,
@@ -160,7 +160,7 @@ CREATE TABLE public.product_variants (
   sku varchar,
   selling_price numeric NOT NULL CHECK (selling_price >= 0.00),
   mrp numeric DEFAULT 0.00,
-  stock_quantity integer NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+  stock_quantity boolean NOT NULL DEFAULT true,
   weight_override numeric,
   image_urls text[] DEFAULT '{}'::text[],
   created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP

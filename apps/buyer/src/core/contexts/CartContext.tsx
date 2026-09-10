@@ -18,7 +18,7 @@ export interface CartItemRow {
     seller_id: string;
     image_urls: string[];
     moq: number;
-    stock_quantity: number;
+    stock_quantity: boolean;
     seller?: {
       seller_id: string;
       business_name: string;
@@ -32,7 +32,7 @@ export interface CartItemRow {
     variant_value: string;
     selling_price: number;
     image_urls: string[];
-    stock_quantity: number;
+    stock_quantity: boolean;
   };
 }
 
@@ -372,7 +372,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             seller_id: incomingSellerId,
             image_urls: product.image_urls ?? [],
             moq: product.moq ?? 1,
-            stock_quantity: product.stock_quantity ?? 999,
+            stock_quantity: typeof product.stock_quantity === 'boolean' ? product.stock_quantity : (product.stock_quantity ?? 1) > 0,
             seller: product.seller ?? { seller_id: incomingSellerId, business_name: 'Seller' },
           },
           variant: variant ? {
@@ -381,7 +381,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             variant_value: variant.variant_value,
             selling_price: variant.selling_price,
             image_urls: variant.image_urls ?? [],
-            stock_quantity: variant.stock_quantity ?? 999,
+            stock_quantity: typeof variant.stock_quantity === 'boolean' ? variant.stock_quantity : (variant.stock_quantity ?? 1) > 0,
           } : undefined,
         };
         guestRows.push(newRow);
@@ -433,7 +433,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             seller_id: conflict.newSeller.seller_id,
             image_urls: conflict.newProduct.image_urls ?? [],
             moq: 1,
-            stock_quantity: 999,
+            stock_quantity: true,
             seller: {
               seller_id: conflict.newSeller.seller_id,
               business_name: conflict.newSeller.business_name,
@@ -445,7 +445,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             variant_value: conflict.newVariant.variant_value,
             selling_price: conflict.newVariant.selling_price,
             image_urls: [],
-            stock_quantity: 999,
+            stock_quantity: true,
           } : undefined,
         };
 

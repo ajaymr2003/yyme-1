@@ -10,7 +10,7 @@ interface VariantDraft {
   variant_value: string;
   selling_price: string;
   mrp: string;
-  stock_quantity: string;
+  stock_quantity: boolean;
 }
 
 export function EditProductPage() {
@@ -29,7 +29,7 @@ export function EditProductPage() {
   const [moq, setMoq] = useState('1');
   const [basePrice, setBasePrice] = useState('');
   const [mrp, setMrp] = useState('');
-  const [stockQuantity, setStockQuantity] = useState('0');
+  const [stockAvailable, setStockAvailable] = useState(true);
   const [haveVariants, setHaveVariants] = useState(false);
   const [variants, setVariants] = useState<VariantDraft[]>([]);
   const [imageUrl, setImageUrl] = useState('');
@@ -51,7 +51,7 @@ export function EditProductPage() {
         setMoq(String(data.moq ?? 1));
         setBasePrice(String(data.base_price));
         setMrp(String(data.mrp ?? ''));
-        setStockQuantity(String(data.stock_quantity ?? 0));
+        setStockAvailable(data.stock_quantity === true || data.stock_quantity > 0 || data.stock_quantity === undefined);
         setHaveVariants(data.have_variants);
         setImageUrl(data.image_urls?.[0] ?? '');
         setIsActive(data.is_active);
@@ -61,7 +61,7 @@ export function EditProductPage() {
           variant_id: v.variant_id, id: v.variant_id,
           variant_type: v.variant_type, variant_value: v.variant_value,
           selling_price: String(v.selling_price), mrp: String(v.mrp ?? ''),
-          stock_quantity: String(v.stock_quantity ?? 0),
+          stock_quantity: v.stock_quantity === true || v.stock_quantity > 0 || v.stock_quantity === undefined,
         })));
         setLoading(false);
       });
@@ -70,7 +70,7 @@ export function EditProductPage() {
   function addVariant() {
     setVariants([...variants, {
       id: crypto.randomUUID(), variant_type: '', variant_value: '',
-      selling_price: '', mrp: '', stock_quantity: '0',
+      selling_price: '', mrp: '', stock_quantity: true,
     }]);
   }
 
@@ -85,7 +85,7 @@ export function EditProductPage() {
       material: material.trim() || null, weight_kg: 0.5,
       moq: parseInt(moq) || 1, base_price: parseFloat(basePrice),
       mrp: parseFloat(mrp) || parseFloat(basePrice),
-      stock_quantity: parseInt(stockQuantity) || 0, have_variants: haveVariants,
+      stock_quantity: stockAvailable, have_variants: haveVariants,
       image_urls: imageUrl ? [imageUrl] : [],
       is_active: status === 'active',
       status: status
@@ -111,7 +111,7 @@ export function EditProductPage() {
         const payload: any = {
           product_id: productId, variant_type: v.variant_type, variant_value: v.variant_value,
           selling_price: parseFloat(v.selling_price), mrp: parseFloat(v.mrp) || 0,
-          stock_quantity: parseInt(v.stock_quantity) || 0,
+          stock_quantity: Boolean(v.stock_quantity),
         };
         if (v.variant_id) {
           await supabase.from('product_variants').update(payload).eq('variant_id', v.variant_id);
@@ -263,9 +263,18 @@ export function EditProductPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Stock</label>
-              <input type="number" value={stockQuantity} onChange={e => setStockQuantity(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Stock Status</label>
+              <label className="flex items-center gap-2 px-3 py-2 border border-neutral-300 rounded-lg cursor-pointer hover:bg-neutral-50 h-[38px]">
+                <input
+                  type="checkbox"
+                  checked={stockAvailable}
+                  onChange={(e) => setStockAvailable(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                />
+                <span className={`text-xs font-bold ${stockAvailable ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {stockAvailable ? '● In Stock' : '○ Out of Stock'}
+                </span>
+              </label>
             </div>
             <div>
               <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">MOQ</label>
@@ -307,8 +316,23 @@ export function EditProductPage() {
                       className="px-2 py-1.5 border border-neutral-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Value" />
                     <input type="number" step="0.01" value={variant.selling_price} onChange={e => setVariants(variants.map(v => v.id === variant.id ? { ...v, selling_price: e.target.value } : v))}
                       className="px-2 py-1.5 border border-neutral-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Price (₹)" />
-                    <input type="number" value={variant.stock_quantity} onChange={e => setVariants(variants.map(v => v.id === variant.id ? { ...v, stock_quantity: e.target.value } : v))}
-                      className="px-2 py-1.5 border border-neutral-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Stock" />
+                    <label className="flex items-center gap-1.5 px-2 py-1.5 border border-neutral-300 rounded text-xs cursor-pointer bg-white">
+                      <input
+                        type="checkbox"
+                        checked={variant.stock_quantity}
+                        onChange={(e) =>
+                          setVariants(
+                            variants.map((v) =>
+                              v.id === variant.id ? { ...v, stock_quantity: e.target.checked } : v
+                            )
+                          )
+                        }
+                        className="w-3.5 h-3.5 text-emerald-600 rounded"
+                      />
+                      <span className={`text-[11px] font-bold ${variant.stock_quantity ? 'text-emerald-700' : 'text-rose-600'}`}>
+                        {variant.stock_quantity ? 'In Stock' : 'Out of Stock'}
+                      </span>
+                    </label>
                   </div>
                 </div>
               ))}

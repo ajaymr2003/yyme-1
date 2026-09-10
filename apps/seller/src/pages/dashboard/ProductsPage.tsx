@@ -10,7 +10,7 @@ interface ProductRow {
   name: string;
   base_price: number;
   mrp: number;
-  stock_quantity: number;
+  stock_quantity: boolean;
   moq?: number;
   is_active: boolean;
   qc_status?: 'submitted' | 'verified' | 'rejected';
@@ -24,7 +24,7 @@ interface ProductRow {
     variant_type: string;
     variant_value: string;
     selling_price: number;
-    stock_quantity: number;
+    stock_quantity: boolean;
     sku?: string;
   }[];
 }
@@ -344,6 +344,16 @@ export function ProductsPage() {
                       <span className="text-[11px] font-semibold text-neutral-500">
                         MOQ: {product.moq || 1}
                       </span>
+                      {(() => {
+                        const inStock = product.have_variants && product.product_variants?.length
+                          ? product.product_variants.some(v => v.stock_quantity === true || (v.stock_quantity as any) > 0)
+                          : (product.stock_quantity === true || (product.stock_quantity as any) > 0);
+                        return (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${inStock ? 'text-emerald-800 bg-emerald-50 border-emerald-200' : 'text-rose-800 bg-rose-50 border-rose-200'}`}>
+                            {inStock ? '● In Stock' : '○ Out of Stock'}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Variant chips preview */}

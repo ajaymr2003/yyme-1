@@ -1,110 +1,150 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
-import { Search, ShoppingCart, X } from 'lucide-react';
+import { ShoppingCart, Store, Search, X, Package } from 'lucide-react';
 
 export function SearchPage() {
   const [searchParams] = useSearchParams();
-  const urlQuery = searchParams.get('q') || '';
-  const [query, setQuery] = useState(urlQuery);
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const { addItem } = useCart();
+  const query = searchParams.get('q') || '';
   const navigate = useNavigate();
-
-  const handleAdd = async (product: any) => {
-    const success = await addItem(product);
-    if (success) {
-      setToastMessage(`Added "${product.name}" to cart!`);
-      setTimeout(() => setToastMessage(null), 2500);
-    }
-  };
-
-  async function doSearch(searchTerm?: string) {
-    const term = searchTerm !== undefined ? searchTerm : query;
-    if (!term.trim()) return;
-    setLoading(true);
-    setSearched(true);
-    const { data } = await supabase
-      .from('products')
-      .select('*, seller:sellers(seller_id, business_name, whatsapp_number, remaining_click_quota), category:categories(name)')
-      .eq('is_active', true)
-      .eq('qc_status', 'verified')
-      .ilike('name', `%${term.trim()}%`)
-      .order('created_at', { ascending: false });
-    setResults(data ?? []);
-    setLoading(false);
-  }
+  const { addItem } = useCart();
+  const [searchQuery, setSearchQuery] = useState(query);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [addedToast, setAddedToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (urlQuery) {
-      setQuery(urlQuery);
-      doSearch(urlQuery);
-    }
-  }, [urlQuery]);
+    if (!searchQuery.trim()) { setProducts([]); return; }
+    setLoading(true);
+    const q = searchQuery.toLowerCase();
+    supabase.from('products')
+      .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+      .eq('is_active', true).eq('qc_status', 'verified')
+      .then(({ data }) => {
+        const all = data ?? [];
+        const filtered = all.filter((p: any) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.category?.name?.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q)
+        );
+        setProducts(filtered);
+        setLoading(false);
+      });
+  }, [searchQuery]);
+
+  const showAddedToast = (name: string) => { setAddedToast(`Added "${name}" to cart!`); setTimeout(() => setAddedToast(null), 2500); };
 
   return (
-    <div className="px-4 py-4">
-      <div className="sticky top-14 z-20 bg-stone-100 pb-3">
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-neutral-400" />
-            <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && doSearch()}
-              className="w-full pl-9 pr-3 py-2 bg-white border border-neutral-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="Search products..." autoFocus />
+    <div className="min-h-screen bg-surface-page text-neutral-900 pb-12">
+      {addedToast && (
+        <div className="fixed bottom-20 right-4 z-50 bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-xl font-medium text-xs flex items-center gap-2">
+          <span>{addedToast}</span>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 pt-4">
+        <div className="bg-white p-4 rounded-xl border border-neutral-200">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <input
+              type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); navigate(`/search?q=${encodeURIComponent(e.target.value)}`, { replace: true }); }}
+              placeholder="Search products..."
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm bg-neutral-50 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              autoFocus
+            />
+            {searchQuery && <button onClick={() => { setSearchQuery(''); navigate('/search'); }} className="absolute right-3 top-1/2 -translate-y-1/2"><X className="w-4 h-4 text-neutral-400" /></button>}
           </div>
-          <button onClick={() => doSearch()} className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors">
-            Search
-          </button>
+          {searchQuery && <p className="text-xs text-neutral-500 mt-2">{products.length} results for "{searchQuery}"</p>}
         </div>
-      </div>
 
-      {loading ? (
-        <div className="text-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto" /></div>
-      ) : searched && results.length === 0 ? (
-        <div className="text-center py-12 text-neutral-400">
-          <Search className="w-10 h-10 mx-auto mb-3 opacity-50" />
-          <p className="text-sm font-medium">No products found for "{query}"</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {results.map(product => (
-            <div key={product.product_id} className="bg-white border border-neutral-200 rounded-xl p-3 flex gap-3 shadow-sm">
-              <Link to={`/product/${product.product_id}`} className="w-20 h-20 bg-neutral-100 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
-                {product.image_urls?.[0] ? (
-                  <img src={product.image_urls[0]} alt={product.name} className="w-full h-full object-cover rounded-lg" />
-                ) : <span className="text-2xl">📦</span>}
-              </Link>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-medium text-emerald-600 uppercase">{product.category?.name}</p>
-                <Link to={`/product/${product.product_id}`}>
-                  <h4 className="text-sm font-semibold text-neutral-900 truncate hover:text-emerald-700 transition-colors">{product.name}</h4>
-                </Link>
-                <p className="text-[10px] text-neutral-500">{product.seller?.business_name}</p>
-                <div className="flex items-center justify-between mt-1.5">
-                  <span className="text-sm font-bold text-neutral-900">{formatINR(product.base_price)}</span>
-                  <button onClick={() => handleAdd(product)}
-                    className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer">
-                    <ShoppingCart className="w-3.5 h-3.5" />
-                  </button>
+        {loading ? (
+          <div className="flex items-center justify-center py-24 text-neutral-500 text-sm">Searching...</div>
+        ) : products.length === 0 && searchQuery ? (
+          <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
+            <Package className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-neutral-800">No products found for "{searchQuery}"</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+            {products.map((p) => {
+              const discount = p.mrp && p.mrp > p.base_price ? Math.round(((p.mrp - p.base_price) / p.mrp) * 100) : 0;
+              const isInStock = p.stock_quantity === true || (p.stock_quantity as any) > 0 || p.stock_quantity === undefined;
+
+              return (
+                <div key={p.product_id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col group">
+                  <div onClick={() => navigate(`/product/${p.product_id}`)} className="relative aspect-square bg-neutral-100 overflow-hidden cursor-pointer">
+                    {p.image_urls?.[0] ? (
+                      <img
+                        src={p.image_urls[0]}
+                        alt={p.name}
+                        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                          !isInStock ? 'opacity-70' : ''
+                        }`}
+                      />
+                    ) : (
+                      <span className="text-3xl flex items-center justify-center h-full">📦</span>
+                    )}
+
+                    {/* Stock & Discount Badges */}
+                    {!isInStock ? (
+                      <span className="absolute top-2 left-2 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-xs uppercase tracking-wider">
+                        Out of Stock
+                      </span>
+                    ) : discount > 0 ? (
+                      <span className="absolute top-2 left-2 bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">
+                        {discount}% OFF
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="p-3 flex-1 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] text-emerald-700 font-bold uppercase">{p.category?.name || 'Handicraft'}</span>
+                      <h3 onClick={() => navigate(`/product/${p.product_id}`)} className="text-xs sm:text-sm font-bold text-neutral-900 line-clamp-2 mt-0.5 cursor-pointer hover:text-emerald-700">{p.name}</h3>
+                      <p className="text-[11px] text-neutral-500 mt-1 flex items-center gap-1"><Store className="w-3 h-3" />{p.seller?.business_name || 'Verified Artisan'}</p>
+                    </div>
+                    <div className="pt-2 border-t border-neutral-100 mt-2">
+                      <div className="flex items-baseline justify-between mb-2">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-sm font-black">{formatINR(p.base_price)}</span>
+                          {discount > 0 && <span className="text-[10px] text-neutral-400 line-through">{formatINR(p.mrp)}</span>}
+                        </div>
+                        {!isInStock && (
+                          <span className="text-[10px] font-bold text-rose-600">
+                            Out of Stock
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!isInStock) return;
+                          await addItem(p);
+                          showAddedToast(p.name);
+                        }}
+                        disabled={!isInStock}
+                        className={`w-full py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                          isInStock
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs'
+                            : 'bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed'
+                        }`}
+                      >
+                        {isInStock ? (
+                          <>
+                            <ShoppingCart className="w-3.5 h-3.5" />Add to Cart
+                          </>
+                        ) : (
+                          'Out of Stock'
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 bg-neutral-900/95 backdrop-blur-xs text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <span>{toastMessage}</span>
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ interface ProductRow {
   name: string;
   base_price: number;
   mrp: number;
-  stock_quantity: number;
+  stock_quantity: boolean;
   moq: number;
   is_active: boolean;
   qc_status: 'submitted' | 'verified' | 'rejected';
@@ -23,7 +23,7 @@ interface ProductRow {
     variant_type: string;
     variant_value: string;
     selling_price: number;
-    stock_quantity: number;
+    stock_quantity: boolean;
     sku?: string;
   }[];
 }
@@ -191,9 +191,9 @@ export function Products() {
         <div className="space-y-3">
           {filteredProducts.map(product => {
             const hasCover = product.image_urls?.length > 0 && product.image_urls[0];
-            const totalStock = product.have_variants && product.product_variants?.length
-              ? product.product_variants.reduce((sum, v) => sum + (v.stock_quantity || 0), 0)
-              : product.stock_quantity;
+            const isInStock = product.have_variants && product.product_variants?.length
+              ? product.product_variants.some(v => v.stock_quantity === true || (v.stock_quantity as any) > 0)
+              : (product.stock_quantity === true || (product.stock_quantity as any) > 0);
 
             return (
               <div key={product.product_id}
@@ -230,7 +230,9 @@ export function Products() {
                         <span className="text-neutral-400 line-through text-[11px]">{formatINR(product.mrp)}</span>
                       )}
                       <span className="text-[11px] text-neutral-500">MOQ: {product.moq}</span>
-                      <span className="text-[11px] text-neutral-500">Stock: {totalStock}</span>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${isInStock ? 'text-emerald-800 bg-emerald-50 border-emerald-200' : 'text-rose-800 bg-rose-50 border-rose-200'}`}>
+                        {isInStock ? '● In Stock' : '○ Out of Stock'}
+                      </span>
                     </div>
 
                     <p className="text-[11px] text-neutral-400">

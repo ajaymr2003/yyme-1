@@ -5,6 +5,7 @@ import { BuyerLayout } from './layouts/BuyerLayout';
 import { HomePage } from './pages/home/HomePage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { ShopPage } from './pages/discovery/ShopPage';
+import { CategoriesPage } from './pages/discovery/CategoriesPage';
 import { SearchPage } from './pages/discovery/SearchPage';
 import { ProductDetailPage } from './pages/discovery/ProductDetailPage';
 import { CartPage } from './pages/cart/CartPage';
@@ -12,6 +13,7 @@ import { CheckoutPage } from './pages/checkout/CheckoutPage';
 import { ProfilePage } from './pages/account/ProfilePage';
 import { WishlistPage } from './pages/account/WishlistPage';
 import { AboutPage } from './pages/about/AboutPage';
+import { SellerStorefront } from './pages/discovery/SellerStorefront';
 
 export function AppRoutes() {
   const { session, loading } = useAuth();
@@ -30,7 +32,8 @@ export function AppRoutes() {
       <Route path="/login" element={session ? <Navigate to="/" /> : <LoginPage />} />
       <Route element={<BuyerLayout />}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/shop" element={<ShopPage />} />
+        <Route path="/shop" element={<CategoriesPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/shop/category/:categoryId" element={<ShopPage />} />
         <Route path="/shop/category/:categoryId/:subCategoryId" element={<ShopPage />} />
         <Route path="/product/:id" element={<ProductDetailPage />} />

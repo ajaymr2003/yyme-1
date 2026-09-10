@@ -396,7 +396,7 @@ export function AddProductPage() {
           mrp: defaultMrp,
           price: defaultPrice,
           is_available: defaultAvailable,
-          stock_quantity: defaultAvailable ? 999 : 0,
+          stock_quantity: defaultAvailable,
           weight: null,
           sku: `SKU-${skuCode}`,
           enabled: true,
@@ -420,7 +420,7 @@ export function AddProductPage() {
       mrp: bulkMrp !== '' ? (parseFloat(bulkMrp) || c.mrp) : c.mrp,
       price: bulkPrice !== '' ? (parseFloat(bulkPrice) || c.price) : c.price,
       is_available: bulkAvailability === 'available' ? true : bulkAvailability === 'out_of_stock' ? false : (c.is_available ?? true),
-      stock_quantity: bulkAvailability === 'available' ? 999 : bulkAvailability === 'out_of_stock' ? 0 : (c.stock_quantity ?? 999),
+      stock_quantity: bulkAvailability === 'available' ? true : bulkAvailability === 'out_of_stock' ? false : (c.is_available ?? true),
     } : c));
   };
 
@@ -541,7 +541,6 @@ export function AddProductPage() {
       const isProductAvailable = hasVariants
         ? enabledCombinations.some(c => c.is_available)
         : isAvailable;
-      const stockVal = isProductAvailable ? 999 : 0;
 
       // 4. Insert into public.products with qc_status ('submitted') and status ('active' | 'inactive')
       const productPayload: any = {
@@ -554,7 +553,7 @@ export function AddProductPage() {
         moq: parseInt(moq) || 1,
         base_price: priceVal,
         mrp: mrpVal,
-        stock_quantity: stockVal,
+        stock_quantity: isProductAvailable,
         have_variants: hasVariants,
         image_urls: reorderedImages,
         is_active: productStatus === 'active' && isProductAvailable,
@@ -601,7 +600,7 @@ export function AddProductPage() {
             sku: combo.sku || null,
             selling_price: combo.price,
             mrp: combo.mrp || 0,
-            stock_quantity: combo.is_available ? 999 : 0,
+            stock_quantity: combo.is_available,
             weight_override: null,
             image_urls: variantImages.filter(url => url.trim() !== '')
           };

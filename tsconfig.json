@@ -16,6 +16,7 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "paths": {
+      "@ymenet/theme": ["./packages/theme"],
       "@ymenet/ui": ["./packages/ui"],
       "@ymenet/utils": ["./packages/utils"]
     }

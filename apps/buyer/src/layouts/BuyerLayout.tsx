@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
-  ShoppingCart, Search, Heart, Bell, User, LogOut, Menu, X,
-  Home, Grid3X3, Package, Store, Moon, Sun, ChevronRight,
+  ShoppingCart, ShoppingBag, Search, Heart, Bell, User, LogOut, Menu, X,
+  Home, Grid3X3, LayoutGrid, Package, Store, Moon, Sun, ChevronRight, ArrowLeft,
   Sparkles, HelpCircle, Settings, MapPin, Wallet, FileText
 } from 'lucide-react';
 import { useAuth } from '../core/contexts/AuthContext';
@@ -27,6 +27,8 @@ export function BuyerLayout() {
   const isProfilePage = location.pathname.startsWith('/profile');
   const isCheckoutPage = location.pathname.startsWith('/checkout');
   const isProductDetail = /^\/product\/[^/]+$/.test(location.pathname);
+  const isCartPage = location.pathname.startsWith('/cart');
+  const isCategoriesPage = location.pathname === '/shop' || location.pathname === '/categories';
   const isHome = location.pathname === '/';
 
   useEffect(() => {
@@ -61,6 +63,9 @@ export function BuyerLayout() {
   };
 
   const activeNav = (path: string) => {
+    if (path === '/shop') {
+      return location.pathname === '/shop' || location.pathname === '/categories' ? 'text-emerald-600' : 'text-neutral-400';
+    }
     return location.pathname === path ? 'text-emerald-600' : 'text-neutral-400';
   };
 
@@ -69,124 +74,139 @@ export function BuyerLayout() {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-stone-100 text-neutral-900'}`}>
-      {/* Announcement Ticker */}
-      {!isProfilePage && !isCheckoutPage && (
-        <div className="bg-emerald-600 text-white text-[11px] font-semibold py-1 px-4 overflow-hidden tracking-wide text-center">
-          <span className="inline-flex items-center gap-2">
-            <Sparkles className="w-3 h-3 animate-pulse" />
-            Free shipping on your first purchase
-          </span>
-        </div>
-      )}
-
+    <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-surface-warm text-neutral-900'}`}>
       {/* Header */}
-      {!isProductDetail && !isCheckoutPage && (
-        <header className={`${isDarkMode ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'} border-b sticky top-0 z-30`}>
-          <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-3">
+      {!isProductDetail && !isCheckoutPage && !isCartPage && !isCategoriesPage && (
+        <header className="sticky top-0 z-30 bg-white border-t-[3px] border-icon-accent border-b border-neutral-200/80">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center gap-2 sm:gap-4">
+            {/* Mobile Back Button (on non-home pages) */}
+            {!isHome && (
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="p-1.5 -ml-1 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors shrink-0 md:hidden cursor-pointer"
+                title="Back"
+                aria-label="Back"
+              >
+                <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+              </button>
+            )}
+
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 shrink-0">
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-black text-xs">Y</span>
-              </div>
-              <span className="text-lg font-black tracking-tight hidden sm:block">YYMEE</span>
+            <Link to="/" className="shrink-0 flex items-center pl-0.5">
+              <img
+                src="/logo.png"
+                alt="YYMEE"
+                className="h-6 sm:h-7 w-auto object-contain"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent && !parent.querySelector('.logo-fallback')) {
+                    const fallback = document.createElement('div');
+                    fallback.className = 'logo-fallback flex items-center gap-1 font-black text-base text-neutral-900 tracking-tight';
+                    fallback.innerHTML = '<span class="text-emerald-600">YY</span>MEE';
+                    parent.appendChild(fallback);
+                  }
+                }}
+              />
             </Link>
 
             {/* Search Bar */}
             {!isProfilePage && (
-              <form onSubmit={handleSearch} className="flex-1 max-w-xl">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              <form onSubmit={handleSearch} className="flex-1 min-w-0">
+                <div className="relative flex items-center">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none stroke-[2]" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search products..."
-                    className={`w-full pl-10 pr-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 border ${
-                      isDarkMode
-                        ? 'bg-neutral-700 border-neutral-600 text-white placeholder-neutral-400'
-                        : 'bg-neutral-100 border-neutral-200 text-neutral-900 placeholder-neutral-500'
-                    }`}
+                    className="w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm bg-surface-input text-neutral-800 placeholder:text-neutral-400 border border-neutral-200/70 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
                   />
                 </div>
               </form>
             )}
 
-            {/* Right Actions */}
-            <div className="flex items-center gap-1">
+            {/* Right Action Icons: Notification Bell & Cart */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'text-yellow-400 hover:bg-neutral-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'}`}
-                title="Toggle Dark Mode"
+                type="button"
+                className="p-2 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors relative cursor-pointer"
+                title="Notifications"
+                aria-label="Notifications"
               >
-                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                <Bell className="w-5 h-5 text-neutral-700 stroke-[1.8]" />
               </button>
 
-              <Link to="/wishlist" className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'text-neutral-300 hover:bg-neutral-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'}`} title="Wishlist">
-                <Heart className="w-5 h-5" />
-              </Link>
-
-              <Link to="/cart" className={`relative p-2 rounded-lg transition-colors ${isDarkMode ? 'text-neutral-300 hover:bg-neutral-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'}`} title="Cart">
-                <ShoppingCart className="w-5 h-5" />
+              <Link
+                to="/cart"
+                className="p-2 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors relative flex items-center justify-center cursor-pointer"
+                title="Shopping Bag"
+                aria-label="Shopping Bag"
+              >
+                <ShoppingBag className="w-5 h-5 text-neutral-800 stroke-[1.8]" />
                 {items.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  <span className="absolute top-1 right-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
                     {items.length}
                   </span>
                 )}
               </Link>
-
-              {session ? (
-                <Link to="/profile" className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'text-neutral-300 hover:bg-neutral-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'}`} title="Profile">
-                  <User className="w-5 h-5" />
-                </Link>
-              ) : (
-                <a href="/login" className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors">
-                  Sign In
-                </a>
-              )}
-
-              {/* Mobile Menu Toggle */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className={`p-2 rounded-lg lg:hidden transition-colors ${isDarkMode ? 'text-neutral-300 hover:bg-neutral-700' : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'}`}
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
             </div>
           </div>
         </header>
       )}
 
-      {/* Category Tabs (below header, hidden on profile/checkout) */}
-      {!isProfilePage && !isCheckoutPage && !isProductDetail && categories.length > 0 && (
-        <div className={`border-b ${isDarkMode ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'} sticky top-[53px] z-20`}>
-          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto scrollbar-none">
-            <Link to="/" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-emerald-600 text-white shrink-0">
-              <Home className="w-3.5 h-3.5" />
-              For You
+      {/* Category Tabs (below header, hidden on profile/checkout/cart/categories) */}
+      {!isProfilePage && !isCheckoutPage && !isProductDetail && !isCartPage && !isCategoriesPage && categories.length > 0 && (
+        <div className={`border-b ${isDarkMode ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'} sticky top-0 md:top-[53px] z-20`}>
+          <div
+            className="max-w-7xl mx-auto flex items-center overflow-x-auto scrollbar-none"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
+          >
+            {/* For You Tab */}
+            <Link
+              to="/"
+              className="relative px-4 py-3 shrink-0 text-sm font-semibold transition-colors whitespace-nowrap"
+            >
+              <span className={isHome ? 'text-brand-600' : 'text-neutral-600 hover:text-neutral-900'}>
+                For You
+              </span>
+              {isHome && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-brand-500 rounded-full" />
+              )}
             </Link>
-            {categories.map((cat) => (
-              <Link
-                key={cat.category_id}
-                to={`/shop/category/${cat.category_id}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-neutral-100 text-neutral-600 hover:bg-neutral-200 shrink-0"
-              >
-                {getCategoryIcon(cat.name, false, isDarkMode)}
-                {cat.name}
-              </Link>
-            ))}
+
+            {/* Dynamic Categories */}
+            {categories.map((cat) => {
+              const isActive = location.pathname === `/shop/category/${cat.category_id}`;
+              return (
+                <Link
+                  key={cat.category_id}
+                  to={`/shop/category/${cat.category_id}`}
+                  className="relative px-4 py-3 shrink-0 text-sm font-semibold transition-colors whitespace-nowrap"
+                >
+                  <span className={isActive ? 'text-brand-600' : 'text-neutral-600 hover:text-neutral-900'}>
+                    {cat.name}
+                  </span>
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-brand-500 rounded-full" />
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-y-auto ${!isProfilePage && !isCheckoutPage ? 'pb-16' : ''}`}>
+      <main className={`flex-1 ${isCategoriesPage ? 'overflow-hidden pb-14 md:pb-0 flex flex-col' : 'overflow-y-auto'} ${!isProfilePage && !isCheckoutPage && !isCategoriesPage ? 'pb-16 md:pb-0' : ''}`}>
         <Outlet />
       </main>
 
-      {/* Mobile Bottom Navigation */}
-      {!isCheckoutPage && (
-        <nav className={`fixed bottom-0 left-0 right-0 border-t flex items-center justify-around px-2 py-1.5 z-30 ${
+      {/* Mobile Bottom Navigation (hidden on product details, checkout, and desktop view) */}
+      {!isCheckoutPage && !isProductDetail && (
+        <nav className={`fixed bottom-0 left-0 right-0 border-t flex items-center justify-around px-2 py-1.5 z-30 md:hidden ${
           isDarkMode ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'
         }`}>
           <Link to="/" className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/')}`}>
@@ -194,21 +214,21 @@ export function BuyerLayout() {
             <span className="text-[10px] font-medium">Home</span>
           </Link>
           <Link to="/shop" className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/shop')}`}>
-            <Grid3X3 className="w-5 h-5" />
+            <LayoutGrid className="w-5 h-5" />
             <span className="text-[10px] font-medium">Categories</span>
-          </Link>
-          <Link to="/cart" className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/cart')}`}>
-            <ShoppingCart className="w-5 h-5" />
-            {items.length > 0 && (
-              <span className="absolute top-0 right-2 bg-emerald-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                {items.length}
-              </span>
-            )}
-            <span className="text-[10px] font-medium">Cart</span>
           </Link>
           <Link to={session ? '/profile' : '/login'} className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/profile')}`}>
             <User className="w-5 h-5" />
             <span className="text-[10px] font-medium">Account</span>
+          </Link>
+          <Link to="/cart" className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/cart')}`}>
+            <ShoppingCart className="w-5 h-5" />
+            {items.length > 0 && (
+              <span className="absolute top-0 right-2 bg-red-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-xs">
+                {items.length}
+              </span>
+            )}
+            <span className="text-[10px] font-medium">Cart</span>
           </Link>
         </nav>
       )}

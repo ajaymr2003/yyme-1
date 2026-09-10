@@ -57,8 +57,21 @@ export function CategoryManager() {
       const updated: Record<string, boolean> = { ...prev };
       cats.forEach((c) => {
         if (updated[c.category_id] === undefined) {
-          updated[c.category_id] = true;
+          updated[c.category_id] = false;
         }
+      });
+      return updated;
+    });
+  };
+
+  const hasAnyExpanded = Object.values(expandedCats).some(Boolean);
+
+  const toggleExpandAll = () => {
+    const nextState = !hasAnyExpanded;
+    setExpandedCats(() => {
+      const updated: Record<string, boolean> = {};
+      categories.forEach((c) => {
+        updated[c.category_id] = nextState;
       });
       return updated;
     });
@@ -336,6 +349,13 @@ export function CategoryManager() {
             />
           </div>
           <button
+            onClick={toggleExpandAll}
+            className="px-3 py-2 bg-white border border-neutral-200 hover:bg-neutral-100 rounded-xl text-neutral-600 text-xs font-bold transition-colors"
+            title={hasAnyExpanded ? 'Collapse all categories' : 'Expand all categories'}
+          >
+            {hasAnyExpanded ? 'Collapse All' : 'Expand All'}
+          </button>
+          <button
             onClick={() => fetchCategories(true)}
             disabled={isRefreshing}
             className="p-2.5 bg-white border border-neutral-200 hover:bg-neutral-100 rounded-xl text-neutral-600 transition-colors disabled:opacity-50"
@@ -381,12 +401,15 @@ export function CategoryManager() {
         ) : (
           filteredLevel1.map((l1) => {
             const level2Children = getChildren(l1.category_id);
-            const isL1Expanded = expandedCats[l1.category_id];
+            const isL1Expanded = isSearching ? true : !!expandedCats[l1.category_id];
 
             return (
               <div key={l1.category_id} className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
                 {/* LEVEL 1 ITEM ROW */}
-                <div className="flex items-center justify-between p-4 border-b border-neutral-200 hover:bg-neutral-50/50 transition-colors">
+                <div
+                  onClick={() => toggleExpand(l1.category_id)}
+                  className="flex items-center justify-between p-4 border-b border-neutral-200 hover:bg-neutral-50/50 transition-colors cursor-pointer select-none"
+                >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-orange-50 border border-orange-100 text-[#f3722c] font-black text-lg rounded-xl flex items-center justify-center shrink-0">
                       {l1.name.charAt(0).toUpperCase()}
@@ -402,7 +425,7 @@ export function CategoryManager() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => handleAddSub(l1)}
                       className="text-neutral-600 hover:text-[#f3722c] font-bold text-xs px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
@@ -438,11 +461,14 @@ export function CategoryManager() {
                     ) : (
                       level2Children.map((l2) => {
                         const level3Children = getChildren(l2.category_id);
-                        const isL2Expanded = expandedCats[l2.category_id];
+                        const isL2Expanded = isSearching ? true : !!expandedCats[l2.category_id];
 
                         return (
                           <div key={l2.category_id} className="bg-white">
-                            <div className="flex items-center justify-between py-3 px-6 hover:bg-neutral-50/50 transition-colors">
+                            <div
+                              onClick={() => toggleExpand(l2.category_id)}
+                              className="flex items-center justify-between py-3 px-6 hover:bg-neutral-50/50 transition-colors cursor-pointer select-none"
+                            >
                               <div className="flex items-center gap-3">
                                 <span className="text-[9px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 shrink-0">
                                   L2
@@ -456,7 +482,7 @@ export function CategoryManager() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   onClick={() => handleAddSub(l2)}
                                   className="text-neutral-500 hover:text-[#f3722c] font-bold text-xs px-2 py-1 transition-colors"

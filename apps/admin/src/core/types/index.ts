@@ -90,7 +90,7 @@ export interface QCProduct {
   base_price: number;
   mrp?: number;
   weight_kg?: number;
-  stock_quantity: number;
+  stock_quantity: boolean;
   moq: number;
   qc_status: string;
   have_variants?: boolean;
@@ -105,7 +105,8 @@ export interface QCProduct {
   maxPrice: number;
   minMrp: number;
   maxMrp: number;
-  totalStock: number;
+  totalStock?: number;
+  isInStock: boolean;
 }
 
 export interface QCVariant {
@@ -116,7 +117,7 @@ export interface QCVariant {
   sku: string;
   selling_price: number;
   mrp: number;
-  stock_quantity: number;
+  stock_quantity: boolean;
   weight_override: number | null;
   image_urls: string[];
 }

@@ -1,0 +1,8 @@
+{
+  "name": "@ymenet/theme",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts"
+}

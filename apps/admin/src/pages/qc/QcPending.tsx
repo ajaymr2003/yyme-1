@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../core/contexts/AdminAuthContext';
 import { QCProduct, QCVariant } from '../../core/types';
-import { Search, Image as ImageIcon, ChevronDown, ChevronUp, RefreshCw, ClipboardCheck, Eye } from 'lucide-react';
+import { Search, Image as ImageIcon, ChevronDown, ChevronUp, RefreshCw, ClipboardCheck, Eye, Check, CheckCircle, X } from 'lucide-react';
 
 export function QcPending() {
   const [products, setProducts] = useState<QCProduct[]>([]);
@@ -11,6 +11,47 @@ export function QcPending() {
   const [currentTab, setCurrentTab] = useState<'pending' | 'rejected'>('pending');
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
+  // Quick Approve State for List View
+  const [approvingProduct, setApprovingProduct] = useState<QCProduct | null>(null);
+  const [approvingLoading, setApprovingLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleQuickApprove = async () => {
+    if (!approvingProduct) return;
+    setApprovingLoading(true);
+    try {
+      const adminId = (await supabase.auth.getUser()).data.user?.id;
+      const { error: updateErr } = await supabase
+        .from('products')
+        .update({
+          qc_status: 'verified',
+        })
+        .eq('product_id', approvingProduct.product_id);
+
+      if (updateErr) throw updateErr;
+
+      await supabase.from('audit_logs').insert([{
+        admin_id: adminId,
+        action: 'APPROVE_PRODUCT_QC',
+        target_id: approvingProduct.product_id,
+        details: { product_name: approvingProduct.name },
+      }]);
+
+      setProducts((prev) => prev.filter((p) => p.product_id !== approvingProduct.product_id));
+      showToast(`"${approvingProduct.name}" approved and published!`);
+      setApprovingProduct(null);
+    } catch (err: any) {
+      alert('Approval failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setApprovingLoading(false);
+    }
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -77,9 +118,9 @@ export function QcPending() {
             }
           }
 
-          const totalStock = pVariantsSorted.length > 0
-            ? pVariantsSorted.reduce((sum: number, v: any) => sum + (v.stock_quantity || 0), 0)
-            : p.stock_quantity;
+          const isInStock = pVariantsSorted.length > 0
+            ? pVariantsSorted.some((v: any) => v.stock_quantity === true || v.stock_quantity > 0)
+            : (p.stock_quantity === true || (p.stock_quantity as any) > 0);
 
           return {
             ...p,
@@ -89,7 +130,8 @@ export function QcPending() {
             maxPrice,
             minMrp,
             maxMrp,
-            totalStock,
+            totalStock: isInStock ? 1 : 0,
+            isInStock,
           };
         });
 
@@ -225,7 +267,7 @@ export function QcPending() {
                   <th className="px-6 py-4">Price</th>
                   <th className="px-6 py-4">Stock</th>
                   <th className="px-6 py-4">Submitted On</th>
-                  <th className="px-6 py-4 text-center">Review</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
                   <th className="px-6 py-4 w-12"></th>
                 </tr>
               </thead>
@@ -280,8 +322,16 @@ export function QcPending() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 font-semibold text-neutral-500">
-                          {p.totalStock} units
+                        <td className="px-6 py-4">
+                          {p.isInStock ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> In Stock
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Out of Stock
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-xs text-neutral-500 font-medium">
                           {new Date(p.created_at).toLocaleDateString('en-IN', {
@@ -289,12 +339,30 @@ export function QcPending() {
                             hour: '2-digit', minute: '2-digit'
                           })}
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <button onClick={(e) => { e.stopPropagation(); setSelectedProductId(p.product_id); }}
-                            className="p-2 hover:bg-amber-100 rounded-lg text-amber-600 transition duration-150"
-                            title="Review Product">
-                            <Eye className="w-4 h-4" />
-                          </button>
+                        <td className="px-6 py-4 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setApprovingProduct(p);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+                              title="Approve & Publish"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Approve</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedProductId(p.product_id);
+                              }}
+                              className="p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-500 hover:text-neutral-800 transition duration-150 border border-neutral-200 cursor-pointer"
+                              title="Review Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                           {p.variants && p.variants.length > 0 ? (
@@ -341,7 +409,13 @@ export function QcPending() {
                                   )}
                                 </div>
                               </td>
-                              <td className="py-3 px-6 font-semibold text-neutral-600">{v.stock_quantity} units</td>
+                              <td className="py-3 px-6">
+                                {v.stock_quantity === true || (v.stock_quantity as any) > 0 ? (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">In Stock</span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">Out of Stock</span>
+                                )}
+                              </td>
                               <td className="py-3 px-6"></td>
                               <td className="py-3 px-6 text-center"></td>
                               <td className="py-3 px-6"></td>
@@ -357,6 +431,81 @@ export function QcPending() {
           </div>
         )}
       </div>
+
+      {/* Quick Approve Confirmation Modal */}
+      {approvingProduct && (
+        <div className="fixed inset-0 bg-neutral-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                </div>
+                <h3 className="font-bold text-base text-neutral-900">Approve Product</h3>
+              </div>
+              <button
+                onClick={() => setApprovingProduct(null)}
+                disabled={approvingLoading}
+                className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <p className="text-sm text-neutral-600">
+                Are you sure you want to approve{' '}
+                <span className="font-bold text-neutral-900">{approvingProduct.name}</span>?
+              </p>
+              <div className="bg-neutral-50 rounded-xl p-3 text-xs text-neutral-500 space-y-1">
+                <p><span className="font-medium text-neutral-700">Seller:</span> {approvingProduct.sellers?.business_name || 'N/A'}</p>
+                <p><span className="font-medium text-neutral-700">Category:</span> {approvingProduct.categories?.name || 'N/A'}</p>
+                <p><span className="font-medium text-neutral-700">Stock:</span> {approvingProduct.isInStock ? 'In Stock' : 'Out of Stock'}</p>
+              </div>
+              <p className="text-xs text-emerald-700 font-medium bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                ✓ This product will be marked as verified and will go live in the marketplace immediately.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setApprovingProduct(null)}
+                disabled={approvingLoading}
+                className="px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickApprove}
+                disabled={approvingLoading}
+                className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {approvingLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Approving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Approve & Publish</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-neutral-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-medium border border-neutral-800 animate-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -483,9 +632,9 @@ function QcDetailView({ productId, onBack }: { productId: string; onBack: () => 
 
   const allImages = getAllImages();
   const hasVariants = variants.length > 0;
-  const totalStock = hasVariants
-    ? variants.reduce((sum, v) => sum + v.stock_quantity, 0)
-    : product?.stock_quantity || 0;
+  const isInStock = hasVariants
+    ? variants.some(v => v.stock_quantity === true || (v.stock_quantity as any) > 0)
+    : (product?.stock_quantity === true || (product?.stock_quantity as any) > 0);
 
   if (loading) {
     return (
@@ -684,8 +833,10 @@ function QcDetailView({ productId, onBack }: { productId: string; onBack: () => 
                 <span className="text-sm font-bold text-neutral-900">{product.moq} units</span>
               </div>
               <div>
-                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block mb-1">Total Stock</span>
-                <span className="text-sm font-bold text-neutral-900">{totalStock} units</span>
+                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block mb-1">Availability</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded border inline-block ${isInStock ? 'text-emerald-800 bg-emerald-50 border-emerald-200' : 'text-rose-800 bg-rose-50 border-rose-200'}`}>
+                  {isInStock ? '● In Stock' : '○ Out of Stock'}
+                </span>
               </div>
             </div>
 
@@ -725,7 +876,13 @@ function QcDetailView({ productId, onBack }: { productId: string; onBack: () => 
                 <tr className="text-neutral-900">
                   <td className="px-5 py-4 text-sm font-bold">\u20B9{product.mrp || 0}</td>
                   <td className="px-5 py-4 text-sm font-bold text-emerald-700">\u20B9{product.base_price}</td>
-                  <td className="px-5 py-4 text-sm font-bold">{product.stock_quantity} units</td>
+                  <td className="px-5 py-4 text-sm font-bold">
+                    {product.stock_quantity === true || (product.stock_quantity as any) > 0 ? (
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">In Stock</span>
+                    ) : (
+                      <span className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">Out of Stock</span>
+                    )}
+                  </td>
                   <td className="px-5 py-4 text-sm font-bold">{product.moq} units</td>
                 </tr>
               </tbody>
@@ -757,7 +914,13 @@ function QcDetailView({ productId, onBack }: { productId: string; onBack: () => 
                     <td className="px-5 py-3 text-sm font-bold text-amber-700">{v.variant_value}</td>
                     <td className="px-5 py-3 text-sm font-medium">\u20B9{v.mrp}</td>
                     <td className="px-5 py-3 text-sm font-bold text-emerald-700">\u20B9{v.selling_price}</td>
-                    <td className="px-5 py-3 text-sm font-semibold">{v.stock_quantity} units</td>
+                    <td className="px-5 py-3 text-sm font-semibold">
+                      {v.stock_quantity === true || (v.stock_quantity as any) > 0 ? (
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">In Stock</span>
+                      ) : (
+                        <span className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">Out of Stock</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3 text-xs font-mono text-neutral-500">{v.sku || '\u2014'}</td>
                   </tr>
                 ))}

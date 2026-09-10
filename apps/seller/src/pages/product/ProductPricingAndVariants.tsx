@@ -23,7 +23,7 @@ export interface VariantCombination {
   mrp: number;
   price: number;
   is_available: boolean;
-  stock_quantity?: number;
+  stock_quantity?: boolean;
   weight?: number | null;
   sku: string;
   enabled: boolean;

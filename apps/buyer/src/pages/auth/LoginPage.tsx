@@ -69,11 +69,32 @@ export function LoginPage() {
     }
   };
 
+  const handleBack = () => {
+    if (step === 'name') {
+      setStep('otp');
+    } else if (step === 'otp') {
+      setStep('phone');
+    } else {
+      navigate(-1);
+    }
+  };
+
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-[#f8faf9]">
+    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-surface-page relative">
+      {/* Back Button for mobile / return to shop */}
+      <button
+        type="button"
+        onClick={handleBack}
+        className="fixed top-4 left-4 p-2.5 rounded-full bg-white border border-neutral-200/90 shadow-sm text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 flex items-center justify-center transition-all z-30 cursor-pointer"
+        title="Go Back"
+        aria-label="Go Back"
+      >
+        <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+      </button>
+
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-[#009661] text-white font-black text-2xl rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+          <div className="w-16 h-16 bg-brand-600 text-white font-black text-2xl rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
             Y
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
@@ -121,8 +142,8 @@ export function LoginPage() {
                 disabled={cleanPhone.length < 10}
                 className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs ${
                   cleanPhone.length === 10
-                    ? 'bg-[#009661] hover:bg-emerald-700 text-white'
-                    : 'bg-[#6dbf9e] text-white opacity-80 cursor-not-allowed'
+                    ? 'bg-brand-600 hover:bg-brand-700 text-white'
+                    : 'bg-brand-200 text-white opacity-80 cursor-not-allowed'
                 }`}
               >
                 Send OTP <ArrowRight className="w-4 h-4" />
@@ -164,7 +185,7 @@ export function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || otp.length < 6}
-                className="w-full bg-[#009661] hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {loading ? 'Verifying...' : 'Verify & Continue'} <ShieldCheck className="w-4 h-4" />
               </button>
@@ -205,7 +226,7 @@ export function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || !fullName.trim()}
-                className="w-full bg-[#009661] hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {loading ? 'Setting up...' : 'Start Shopping'} <ArrowRight className="w-4 h-4" />
               </button>

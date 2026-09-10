@@ -10,14 +10,16 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
+    "@ymenet/theme": "1.0.0",
+    "@ymenet/ui": "1.0.0",
+    "@ymenet/utils": "1.0.0",
     "lucide-react": "^0.300.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.0",
-    "@ymenet/ui": "1.0.0",
-    "@ymenet/utils": "1.0.0"
+    "react-router-dom": "^6.21.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
