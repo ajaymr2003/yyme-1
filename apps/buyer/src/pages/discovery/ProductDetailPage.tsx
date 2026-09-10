@@ -177,7 +177,7 @@ export function ProductDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 lg:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-28 lg:pb-12">
       {addedToast && (
         <div className="fixed bottom-20 right-4 z-50 bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-xl font-medium text-xs flex items-center gap-2 animate-bounce">
           <Check className="w-4 h-4" />
@@ -400,21 +400,22 @@ export function ProductDetailPage() {
             </div>
           )}
 
-          {/* Desktop Add to Cart / Buy Now */}
+          {/* Desktop Only Action Buttons (On Mobile, sticky bottom bar is used) */}
           <div className="hidden lg:block bg-white border-b border-gray-100 py-4">
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
+                type="button"
                 onClick={handleAddToCart}
                 disabled={!isInStock}
-                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all text-sm ${
+                className={`flex-1 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm ${
                   isInStock
-                    ? 'text-emerald-700 border-2 border-emerald-600 bg-white hover:bg-emerald-50 cursor-pointer shadow-xs'
+                    ? 'text-emerald-700 border-2 border-emerald-600 bg-white hover:bg-emerald-50 active:scale-[0.99] cursor-pointer shadow-xs'
                     : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                 }`}
               >
                 {addedToCart ? (
                   <>
-                    <Check className="w-4 h-4" /> Added
+                    <Check className="w-4 h-4" /> Added to Cart
                   </>
                 ) : isInStock ? (
                   <>
@@ -425,15 +426,17 @@ export function ProductDetailPage() {
                 )}
               </button>
               <button
+                type="button"
                 onClick={handleBuyNow}
                 disabled={!isInStock}
-                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all text-sm ${
+                className={`flex-1 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm ${
                   isInStock
-                    ? 'text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer shadow-xs'
+                    ? 'text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer shadow-md'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                {isInStock ? 'Buy Now' : 'Currently Unavailable'}
+                <MessageCircle className="w-4 h-4" />
+                {isInStock ? 'Buy Now ' : 'Currently Unavailable'}
               </button>
             </div>
           </div>
@@ -590,14 +593,15 @@ export function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Mobile Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex gap-3 z-30 lg:hidden shadow-lg">
+      {/* Mobile Fixed Bottom Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-3 flex gap-3 z-40 lg:hidden shadow-2xl">
         <button
+          type="button"
           onClick={handleAddToCart}
           disabled={!isInStock}
-          className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all text-sm ${
+          className={`flex-1 py-3 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs sm:text-sm ${
             isInStock
-              ? 'text-emerald-700 border-2 border-emerald-600 bg-white hover:bg-emerald-50 cursor-pointer shadow-xs'
+              ? 'text-emerald-700 border-2 border-emerald-600 bg-white hover:bg-emerald-50 active:scale-[0.99] cursor-pointer shadow-xs'
               : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
           }`}
         >
@@ -614,14 +618,16 @@ export function ProductDetailPage() {
           )}
         </button>
         <button
+          type="button"
           onClick={handleBuyNow}
           disabled={!isInStock}
-          className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all text-sm ${
+          className={`flex-1 py-3 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs sm:text-sm ${
             isInStock
-              ? 'text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer shadow-xs'
+              ? 'text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer shadow-md'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
+          <MessageCircle className="w-4 h-4" />
           {isInStock ? 'Buy Now' : 'Out of Stock'}
         </button>
       </div>
