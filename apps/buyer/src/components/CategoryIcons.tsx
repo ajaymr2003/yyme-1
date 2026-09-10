@@ -243,56 +243,48 @@ export const ScooterIcon: React.FC<CategoryIconProps> = ({
   </svg>
 );
 
-export function getCategoryIcon(name: string, active = false, isDarkMode = false, size = 30) {
+export function getCategoryIcon(name: string, active = false, isDarkMode = false, size = 36) {
   const lower = name.toLowerCase();
-  const accent = themeTokens.colors.iconAccent;
-  const outline = isDarkMode ? themeTokens.colors.iconOutlineLight : themeTokens.colors.iconOutline;
+  let IconComponent = BagIcon;
 
-  if (lower.includes('diy') || lower.includes('craft') || lower.includes('supplies')) {
-    return <HomeIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('handicraft') || lower.includes('artisan') || lower.includes('pottery') || lower.includes('ceramic')) {
-    return <BagIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
+  if (lower.includes('fashion') || lower.includes('cloth') || lower.includes('wear') || lower.includes('apparel')) {
+    IconComponent = FashionIcon;
+  } else if (lower.includes('mobile') || lower.includes('phone') || lower.includes('smartphone')) {
+    IconComponent = MobilesIcon;
+  } else if (lower.includes('electronic') || lower.includes('laptop') || lower.includes('computer') || lower.includes('tech') || lower.includes('gadget')) {
+    IconComponent = ElectronicsIcon;
+  } else if (lower.includes('beauty') || lower.includes('makeup') || lower.includes('personal') || lower.includes('cosmetic')) {
+    IconComponent = BeautyIcon;
+  } else if (lower.includes('appliance') || lower.includes('tv') || lower.includes('refrigerator')) {
+    IconComponent = AppliancesIcon;
+  } else if (lower.includes('furniture') || lower.includes('sofa') || lower.includes('bed') || lower.includes('chair')) {
+    IconComponent = FurnitureIcon;
+  } else if (lower.includes('home') || lower.includes('decor') || lower.includes('kitchen') || lower.includes('living')) {
+    IconComponent = HomeIcon;
+  } else if (lower.includes('toy') || lower.includes('baby') || lower.includes('kid')) {
+    IconComponent = ToysIcon;
+  } else if (lower.includes('health') || lower.includes('nutrition') || lower.includes('medicine') || lower.includes('pharmacy') || lower.includes('supplement')) {
+    IconComponent = NutritionIcon;
+  } else if (lower.includes('auto') || lower.includes('car') || lower.includes('helmet') || lower.includes('vehicle accessory')) {
+    IconComponent = AutoIcon;
+  } else if (lower.includes('sport') || lower.includes('fitness') || lower.includes('gym') || lower.includes('cricket')) {
+    IconComponent = SportsIcon;
+  } else if (lower.includes('book') || lower.includes('stationery') || lower.includes('office') || lower.includes('education')) {
+    IconComponent = BooksIcon;
+  } else if (lower.includes('bike') || lower.includes('scooter') || lower.includes('two wheeler') || lower.includes('motorcycle')) {
+    IconComponent = ScooterIcon;
+  } else if (lower.includes('diy') || lower.includes('craft') || lower.includes('supplies') || lower.includes('handicraft') || lower.includes('artisan') || lower.includes('pottery') || lower.includes('ceramic')) {
+    IconComponent = HomeIcon;
+  } else if (lower.includes('food') || lower.includes('grocery') || lower.includes('supermarket') || lower.includes('kwik') || lower.includes('for you')) {
+    IconComponent = BagIcon;
   }
 
-  if (lower.includes('fashion') || lower.includes('cloth') || lower.includes('saree') || lower.includes('wear')) {
-    return <FashionIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('mobile') || lower.includes('phone')) {
-    return <MobilesIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('electronic') || lower.includes('tech') || lower.includes('gadget')) {
-    return <ElectronicsIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('beauty') || lower.includes('personal') || lower.includes('cosmetic')) {
-    return <BeautyIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('home') || lower.includes('living') || lower.includes('decor') || lower.includes('kitchen')) {
-    return <HomeIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('appliance')) {
-    return <AppliancesIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('toy') || lower.includes('baby') || lower.includes('kids')) {
-    return <ToysIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('nutrition') || lower.includes('food') || lower.includes('drink') || lower.includes('grocery')) {
-    return <NutritionIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('auto') || lower.includes('vehicle') || lower.includes('car')) {
-    return <AutoIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('sport') || lower.includes('fitness') || lower.includes('gym')) {
-    return <SportsIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('furniture') || lower.includes('furnishing')) {
-    return <FurnitureIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('book') || lower.includes('stationery') || lower.includes('education')) {
-    return <BooksIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  if (lower.includes('scooter') || lower.includes('bike') || lower.includes('two wheeler')) {
-    return <ScooterIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
-  }
-  return <BagIcon size={size} active={active} accentColor={accent} outlineColor={outline} />;
+  const outline = isDarkMode ? '#F3F4F6' : '#111111';
+  const accent = '#10B981';
+
+  return (
+    <div className="flex items-center justify-center p-0 rounded-xl transition-transform duration-200 group-hover:scale-105">
+      <IconComponent size={size} active={active} outlineColor={outline} accentColor={accent} />
+    </div>
+  );
 }

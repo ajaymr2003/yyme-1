@@ -5,10 +5,9 @@ import {
   Home, Grid3X3, LayoutGrid, Package, Store, Moon, Sun, ChevronRight, ArrowLeft,
   Sparkles, HelpCircle, Settings, MapPin, Wallet, FileText
 } from 'lucide-react';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth, supabase } from '../core/contexts/AuthContext';
 import { useCart } from '../core/contexts/CartContext';
-import { supabase } from '../core/contexts/AuthContext';
-import { getCategoryIcon } from '../components/CategoryIcons';
+import { getCategoryIcon, BagIcon } from '../components/CategoryIcons';
 
 import { cacheService, CACHE_KEYS, CACHE_TTL } from '../core/services/cacheService';
 
@@ -172,22 +171,27 @@ export function BuyerLayout() {
 
       {/* Category Tabs (below header, hidden on profile/checkout/cart/categories) */}
       {!isProfilePage && !isCheckoutPage && !isProductDetail && !isCartPage && !isCategoriesPage && categories.length > 0 && (
-        <div className={`border-b ${isDarkMode ? 'bg-neutral-800 border-neutral-700' : 'bg-white border-neutral-200'} sticky top-0 md:top-[53px] z-20`}>
+        <div className={`py-1.5 border-b shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-colors duration-200 sticky top-0 md:top-[53px] z-20 ${
+          isDarkMode ? 'bg-[#1F2937] border-neutral-800' : 'bg-white border-neutral-100'
+        }`}>
           <div
-            className="max-w-7xl mx-auto flex items-center overflow-x-auto scrollbar-none"
+            className="max-w-7xl mx-auto px-4 flex items-start gap-4 sm:gap-6 overflow-x-auto scrollbar-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
           >
             {/* For You Tab */}
             <Link
               to="/"
-              className="relative px-4 py-3 shrink-0 text-sm font-semibold transition-colors whitespace-nowrap"
+              className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] group shrink-0 cursor-pointer"
             >
-              <span className={isHome ? 'text-brand-600' : 'text-neutral-600 hover:text-neutral-900'}>
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${isHome ? 'bg-[#7a9488]' : ''}`}>
+                {getCategoryIcon('For You', isHome, isDarkMode, 34)}
+              </div>
+              <span className={`text-[10px] sm:text-[11px] truncate max-w-[60px] text-center transition-colors ${
+                isHome ? 'font-bold text-neutral-900' : 'text-neutral-600 font-medium'
+              }`}>
                 For You
               </span>
-              {isHome && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-brand-500 rounded-full" />
-              )}
+              {isHome && <span className="h-[2px] w-full bg-[#10B981] rounded-full" />}
             </Link>
 
             {/* Dynamic Categories */}
@@ -197,14 +201,17 @@ export function BuyerLayout() {
                 <Link
                   key={cat.category_id}
                   to={`/shop/category/${cat.category_id}`}
-                  className="relative px-4 py-3 shrink-0 text-sm font-semibold transition-colors whitespace-nowrap"
+                  className="flex flex-col items-center justify-center gap-0.5 min-w-[56px] group shrink-0 cursor-pointer"
                 >
-                  <span className={isActive ? 'text-brand-600' : 'text-neutral-600 hover:text-neutral-900'}>
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${isActive ? 'bg-[#7a9488]' : ''}`}>
+                    {getCategoryIcon(cat.name, isActive, isDarkMode, 34)}
+                  </div>
+                  <span className={`text-[10px] sm:text-[11px] truncate max-w-[60px] text-center transition-colors ${
+                    isActive ? 'font-bold text-neutral-900' : 'text-neutral-600 font-medium'
+                  }`}>
                     {cat.name}
                   </span>
-                  {isActive && (
-                    <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-brand-500 rounded-full" />
-                  )}
+                  {isActive && <span className="h-[2px] w-full bg-[#10B981] rounded-full" />}
                 </Link>
               );
             })}
