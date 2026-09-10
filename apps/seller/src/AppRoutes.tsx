@@ -2,9 +2,15 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSellerAuth } from './core/contexts/SellerAuthContext';
 import { SellerLayout } from './components/SellerLayout';
-import { LandingPage } from './pages/landing/LandingPage';
+import { LandingLayout } from './pages/landing/LandingLayout';
+import { Landing } from './pages/landing/Landing';
+import { HowItWorks } from './pages/landing/HowItWorks';
+import { Pricing } from './pages/landing/Pricing';
+import { Shipping } from './pages/landing/Shipping';
+import { NoGst } from './pages/landing/NoGst';
 import { OnboardingPage } from './pages/onboarding/OnboardingPage';
 import { LoginPage } from './pages/login/LoginPage';
+import { SignupPage } from './pages/login/SignupPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { ProductsPage } from './pages/dashboard/ProductsPage';
 import { AddProductPage } from './pages/product/AddProductPage';
@@ -26,8 +32,16 @@ export function AppRoutes() {
 
   if (!session) return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route element={<LandingLayout />}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/landing" element={<Landing />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/shipping" element={<Shipping />} />
+        <Route path="/no-gst" element={<NoGst />} />
+      </Route>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

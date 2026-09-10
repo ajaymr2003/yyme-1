@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../core/contexts/AuthContext';
 import { useCart } from '../core/contexts/CartContext';
 import { supabase } from '../core/contexts/AuthContext';
+import { getCategoryIcon } from '../components/CategoryIcons';
 
 export function BuyerLayout() {
   const { session, buyerProfile, signOut } = useAuth();
@@ -170,7 +171,7 @@ export function BuyerLayout() {
                 to={`/shop/category/${cat.category_id}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-neutral-100 text-neutral-600 hover:bg-neutral-200 shrink-0"
               >
-                <Grid3X3 className="w-3.5 h-3.5" />
+                {getCategoryIcon(cat.name, false, isDarkMode)}
                 {cat.name}
               </Link>
             ))}

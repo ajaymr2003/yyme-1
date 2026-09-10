@@ -30,6 +30,10 @@ import {
   Check,
   Package,
 } from 'lucide-react';
+import { FeatureBenefits } from '../../components/FeatureBenefits';
+import { WhyChooseUs } from '../../components/WhyChooseUs';
+import { MarketplaceStats } from '../../components/MarketplaceStats';
+import { SellerCTA } from '../../components/SellerCTA';
 
 const TESTIMONIALS = [
   {
@@ -258,15 +262,7 @@ export function HomePage() {
         </div>
       )}
 
-      {/* 1. TOP ANNOUNCEMENT TICKER */}
-      <div className="bg-emerald-600 text-white text-[11px] font-semibold py-1.5 px-4 overflow-hidden tracking-wide text-center">
-        <span className="inline-flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-          ⚡ Free delivery benefits • Direct WhatsApp ordering • 100% Verified Indian Artisans & Local Sellers • Fair transparent pricing
-        </span>
-      </div>
-
-      {/* 2. SUB-BAR: CATEGORIES HORIZONTAL NAVIGATION */}
+      {/* SUB-BAR: CATEGORIES HORIZONTAL NAVIGATION */}
       <div className="bg-white border-b border-neutral-200 sticky top-[57px] z-20 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-2 overflow-x-auto scrollbar-none">
           <button
@@ -396,48 +392,8 @@ export function HomePage() {
           )}
         </section>
 
-        {/* 4. VALUE PROPOSITIONS & BUYER BENEFITS */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
-              <Truck className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-neutral-900">Direct Delivery</h4>
-              <p className="text-[11px] text-neutral-500">Shipped straight from the maker</p>
-            </div>
-          </div>
-
-          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 border border-blue-100">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-neutral-900">Verified Artisans</h4>
-              <p className="text-[11px] text-neutral-500">Authentic & certified sellers</p>
-            </div>
-          </div>
-
-          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
-              <MessageCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-neutral-900">WhatsApp Connect</h4>
-              <p className="text-[11px] text-neutral-500">Direct seller chat & ordering</p>
-            </div>
-          </div>
-
-          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center shrink-0 border border-purple-100">
-              <Award className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-neutral-900">0% Middleman Fee</h4>
-              <p className="text-[11px] text-neutral-500">Direct fair-trade producer prices</p>
-            </div>
-          </div>
-        </section>
+        {/* 4. FEATURE BENEFITS STRIP */}
+        <FeatureBenefits />
 
         {/* 5. PRODUCT SHOWCASE TABS & GRID */}
         <section className="space-y-4">
@@ -695,7 +651,16 @@ export function HomePage() {
           </section>
         )}
 
-        {/* 8. TESTIMONIALS & TRUST REVIEWS */}
+        {/* 8. WHY CHOOSE US */}
+        <WhyChooseUs />
+
+        {/* 9. MARKETPLACE STATS */}
+        <MarketplaceStats />
+
+        {/* 10. SELLER CTA */}
+        <SellerCTA />
+
+        {/* 11. TESTIMONIALS & TRUST REVIEWS */}
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-bold text-neutral-900">Buyer Experiences</h2>

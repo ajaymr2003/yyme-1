@@ -91,6 +91,7 @@ interface SellerAuthCtx {
   user: User | null;
   sellerProfile: SellerProfile | null;
   loading: boolean;
+  checkSellerExists: (phone: string) => Promise<SellerProfile | null>;
   signUp: (phone: string) => Promise<void>;
   loginWithOtp: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string) => Promise<{ isNewSeller: boolean }>;
@@ -169,6 +170,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  async function checkSellerExists(phone: string): Promise<SellerProfile | null> {
+    const { cleanPhone } = getSellerShadowCredentials(phone);
+    const formattedPhone = `+91${cleanPhone}`;
+
+    // 1. Check in sellers directly
+    try {
+      const { data: sellerDirect } = await supabase
+        .from('sellers')
+        .select('*')
+        .or(`phone_number.eq.${formattedPhone},phone_number.eq.${cleanPhone},whatsapp_number.eq.${cleanPhone},whatsapp_number.eq.${formattedPhone}`)
+        .maybeSingle();
+
+      if (sellerDirect) return sellerDirect;
+    } catch (e) {
+      console.warn('Direct seller lookup note:', e);
+    }
+
+    // 2. Check via users table
+    try {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('user_id')
+        .or(`phone_number.eq.${formattedPhone},phone_number.eq.${cleanPhone}`)
+        .maybeSingle();
+
+      if (existingUser?.user_id) {
+        const { data: sellerViaUser } = await supabase
+          .from('sellers')
+          .select('*')
+          .eq('user_id', existingUser.user_id)
+          .maybeSingle();
+        if (sellerViaUser) return sellerViaUser;
+      }
+    } catch (e) {
+      console.warn('User-linked seller lookup note:', e);
+    }
+
+    return null;
+  }
+
   async function signUp(phone: string) {
     const { cleanPhone } = getSellerShadowCredentials(phone);
     if (cleanPhone.length !== 10) {
@@ -181,6 +222,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (cleanPhone.length !== 10) {
       throw new Error('Please enter a valid 10-digit phone number.');
     }
+
+    const seller = await checkSellerExists(phone);
+    if (!seller) {
+      throw new Error('No seller account found with this phone number. Please check your number or create a new account.');
+    }
   }
 
   async function verifyOtp(phone: string, otp: string): Promise<{ isNewSeller: boolean }> {
@@ -191,22 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { cleanPhone, email, password } = getSellerShadowCredentials(phone);
     const formattedPhone = `+91${cleanPhone}`;
 
-    // 1. Check if user already exists in DB
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('user_id')
-      .or(`phone_number.eq.${formattedPhone},phone_number.eq.${cleanPhone}`)
-      .maybeSingle();
-
-    let existingSeller: SellerProfile | null = null;
-    if (existingUser?.user_id) {
-      const { data: s } = await supabase
-        .from('sellers')
-        .select('*')
-        .eq('user_id', existingUser.user_id)
-        .maybeSingle();
-      existingSeller = s;
-    }
+    const existingSeller = await checkSellerExists(phone);
 
     // If no existing seller record, signal that the seller must complete registration
     if (!existingSeller) {
@@ -398,7 +429,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <SellerAuthContext.Provider value={{ session, user, sellerProfile, loading, signUp, loginWithOtp, verifyOtp, completeRegistration, signOut, refreshProfile }}>
+    <SellerAuthContext.Provider value={{ session, user, sellerProfile, loading, checkSellerExists, signUp, loginWithOtp, verifyOtp, completeRegistration, signOut, refreshProfile }}>
       {children}
     </SellerAuthContext.Provider>
   );
