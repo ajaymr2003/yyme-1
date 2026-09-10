@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSellerAuth, supabase } from '../../core/contexts/SellerAuthContext';
+import { getCached, setCache, invalidateCachePrefix, CACHE_TTL } from '../../core/cache';
 import { ArrowLeft, Plus, Trash2, Save, AlertTriangle, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 interface VariantDraft {
@@ -37,32 +38,46 @@ export function EditProductPage() {
   const [status, setStatus] = useState<'active' | 'inactive' | 'revoked'>('active');
   const [qcStatus, setQcStatus] = useState<'submitted' | 'verified' | 'rejected'>('submitted');
 
+  function applyProductData(data: any) {
+    setName(data.name);
+    setCategoryId(data.category_id);
+    setDescription(data.description ?? '');
+    setMaterial(data.material ?? '');
+    setMoq(String(data.moq ?? 1));
+    setBasePrice(String(data.base_price));
+    setMrp(String(data.mrp ?? ''));
+    setStockAvailable(data.stock_quantity === true || data.stock_quantity > 0 || data.stock_quantity === undefined);
+    setHaveVariants(data.have_variants);
+    setImageUrl(data.image_urls?.[0] ?? '');
+    setIsActive(data.is_active);
+    setStatus(data.status || (data.is_active ? 'active' : 'inactive'));
+    setQcStatus(data.qc_status || 'submitted');
+    setVariants((data.product_variants ?? []).map((v: any) => ({
+      variant_id: v.variant_id, id: v.variant_id,
+      variant_type: v.variant_type, variant_value: v.variant_value,
+      selling_price: String(v.selling_price), mrp: String(v.mrp ?? ''),
+      stock_quantity: v.stock_quantity === true || v.stock_quantity > 0 || v.stock_quantity === undefined,
+    })));
+  }
+
   useEffect(() => {
-    supabase.from('categories').select('*').eq('level', 1).order('display_order').then(({ data }) => setCategories(data ?? []));
+    const cachedCats = getCached<any[]>('seller:categories', CACHE_TTL.HOUR);
+    if (cachedCats) setCategories(cachedCats);
+    else supabase.from('categories').select('*').eq('level', 1).order('display_order').then(({ data }) => { const d = data ?? []; setCategories(d); setCache('seller:categories', d); });
 
     if (!productId) return;
+    const productKey = `seller:product:${productId}`;
+    const cachedProduct = getCached<any>(productKey, CACHE_TTL.MINUTE_5);
+    if (cachedProduct) {
+      applyProductData(cachedProduct);
+      setLoading(false);
+      return;
+    }
     supabase.from('products').select('*, product_variants(*)').eq('product_id', productId).single()
       .then(({ data }) => {
         if (!data) { setLoading(false); return; }
-        setName(data.name);
-        setCategoryId(data.category_id);
-        setDescription(data.description ?? '');
-        setMaterial(data.material ?? '');
-        setMoq(String(data.moq ?? 1));
-        setBasePrice(String(data.base_price));
-        setMrp(String(data.mrp ?? ''));
-        setStockAvailable(data.stock_quantity === true || data.stock_quantity > 0 || data.stock_quantity === undefined);
-        setHaveVariants(data.have_variants);
-        setImageUrl(data.image_urls?.[0] ?? '');
-        setIsActive(data.is_active);
-        setStatus(data.status || (data.is_active ? 'active' : 'inactive'));
-        setQcStatus(data.qc_status || 'submitted');
-        setVariants((data.product_variants ?? []).map((v: any) => ({
-          variant_id: v.variant_id, id: v.variant_id,
-          variant_type: v.variant_type, variant_value: v.variant_value,
-          selling_price: String(v.selling_price), mrp: String(v.mrp ?? ''),
-          stock_quantity: v.stock_quantity === true || v.stock_quantity > 0 || v.stock_quantity === undefined,
-        })));
+        applyProductData(data);
+        setCache(productKey, data);
         setLoading(false);
       });
   }, [productId]);
@@ -99,6 +114,9 @@ export function EditProductPage() {
     }
 
     if (prodErr) { setError(prodErr.message); setSaving(false); return; }
+
+    invalidateCachePrefix('seller:products');
+    if (productId) invalidateCachePrefix(`seller:product:${productId}`);
 
     // Sync variants
     const existingIds = variants.filter(v => v.variant_id).map(v => v.variant_id);

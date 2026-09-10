@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSellerAuth, supabase } from '../../core/contexts/SellerAuthContext';
 import { useQuota } from '../../core/contexts/QuotaContext';
 import { formatINR } from '@ymenet/utils';
+import { getCached, setCache, invalidateCachePrefix, CACHE_TTL } from '../../core/cache';
 import { ArrowLeft, Check, Upload, Zap, Clock, AlertTriangle, Image as ImageIcon, X, Copy, CheckCircle } from 'lucide-react';
 
 const TIER_ORDER = ['free', 'standard', 'premium', 'extra_premium'];
@@ -37,23 +38,36 @@ export function SubscriptionPage() {
 
   useEffect(() => {
     if (!sellerProfile) return;
-    supabase.from('subscription_upgrade_requests')
+
+    const pendingKey = `seller:pending_upgrade:${sellerProfile.seller_id}`;
+    const configKey = 'seller:platform_config';
+    const plansKey = 'seller:subscription_plans';
+
+    const cachedPending = getCached<any>(pendingKey, CACHE_TTL.MINUTE_1);
+    if (cachedPending) setPendingRequest(cachedPending);
+    else supabase.from('subscription_upgrade_requests')
       .select('*, plan:subscription_plans(name)')
       .eq('seller_id', sellerProfile.seller_id)
       .eq('status', 'pending_approval')
       .maybeSingle()
-      .then(({ data }) => setPendingRequest(data));
+      .then(({ data }) => { setPendingRequest(data); if (data) setCache(pendingKey, data); });
 
-    supabase.from('platform_config').select('key, value')
+    const cachedConfig = getCached<Record<string, string>>(configKey, CACHE_TTL.HOUR);
+    if (cachedConfig) setPaymentConfig(cachedConfig);
+    else supabase.from('platform_config').select('key, value')
       .then(({ data }) => {
         if (data) {
           const map: Record<string, string> = {};
           (data as { key: string; value: string }[]).forEach((e) => { map[e.key] = e.value; });
           setPaymentConfig(map);
+          setCache(configKey, map);
         }
       });
-    supabase.from('subscription_plans').select('*').order('monthly_price')
-      .then(({ data }) => { setPlans((data as any) ?? []); setLoading(false); });
+
+    const cachedPlans = getCached<Plan[]>(plansKey, CACHE_TTL.HOUR);
+    if (cachedPlans) { setPlans(cachedPlans); setLoading(false); }
+    else supabase.from('subscription_plans').select('*').order('monthly_price')
+      .then(({ data }) => { const p = (data as any) ?? []; setPlans(p); setCache(plansKey, p); setLoading(false); });
   }, []);
 
   function handleSelectPlan(planId: string) {
@@ -128,6 +142,7 @@ export function SubscriptionPage() {
         plan: plan ? { name: plan.name } : null,
         created_at: new Date().toISOString(),
       });
+      invalidateCachePrefix(`seller:pending_upgrade:${sellerProfile.seller_id}`);
       setSubmitSuccess(true);
       setTimeout(() => { setShowUpgradeModal(false); setSubmitSuccess(false); setUtrNumber(''); setProofFile(null); setProofPreview(null); }, 3000);
     }

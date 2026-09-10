@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSellerAuth, supabase } from '../../core/contexts/SellerAuthContext';
 import { useQuota } from '../../core/contexts/QuotaContext';
 import { formatINR } from '@ymenet/utils';
+import { getCached, setCache, invalidateCachePrefix, CACHE_TTL } from '../../core/cache';
 import { Plus, Search, Package, Edit2, Eye, EyeOff, Trash2, CheckCircle2, Clock, Ban } from 'lucide-react';
 
 interface ProductRow {
@@ -39,8 +40,12 @@ export function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('active');
 
+  const productsCacheKey = sellerProfile ? `seller:products:${sellerProfile.seller_id}` : '';
+
   async function fetchProducts() {
     if (!sellerProfile) return;
+    const cached = getCached<ProductRow[]>(productsCacheKey, CACHE_TTL.MINUTE_1);
+    if (cached) { setProducts(cached); setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase
       .from('products')
@@ -51,7 +56,9 @@ export function ProductsPage() {
     if (error) {
       console.error('Error fetching products:', error);
     } else {
-      setProducts((data as any) ?? []);
+      const rows = (data as any) ?? [];
+      setProducts(rows);
+      setCache(productsCacheKey, rows);
     }
     setLoading(false);
   }
@@ -80,6 +87,7 @@ export function ProductsPage() {
       await supabase.from('products').update({ is_active: newIsActive }).eq('product_id', product.product_id);
     }
     setProducts(products.map(p => p.product_id === product.product_id ? { ...p, is_active: newIsActive, status: newStatus } : p));
+    invalidateCachePrefix(productsCacheKey);
   }
 
   async function handleDelete(productId: string) {
@@ -87,6 +95,7 @@ export function ProductsPage() {
     const { error } = await supabase.from('products').delete().eq('product_id', productId);
     if (!error) {
       setProducts(products.filter(p => p.product_id !== productId));
+      invalidateCachePrefix(productsCacheKey);
     } else {
       alert(`Failed to delete: ${error.message}`);
     }

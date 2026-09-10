@@ -17,42 +17,72 @@ import {
   X,
   Layers,
   AlertCircle,
-  MessageCircle
+  MessageCircle,
+  Search
 } from 'lucide-react';
+
+import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addItem } = useCart();
-  const [product, setProduct] = useState<any>(null);
-  const [variants, setVariants] = useState<any[]>([]);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { addItem, items } = useCart();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const totalCartCount = items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
+
+  // Initialize synchronously from cache if present (eliminates loading spinner!)
+  const initialCache = id ? cacheService.get<{ product: any; variants: any[]; related: any[] }>(CACHE_KEYS.PRODUCT_DETAIL(id), true)?.data : null;
+
+  const [product, setProduct] = useState<any>(initialCache?.product ?? null);
+  const [variants, setVariants] = useState<any[]>(initialCache?.variants ?? []);
+  const [selectedVariant, setSelectedVariant] = useState<any>(() => {
+    if (initialCache?.variants && initialCache.variants.length > 0) {
+      const inStockVar = initialCache.variants.find(
+        (v: any) => v.stock_quantity === true || (v.stock_quantity as any) > 0
+      );
+      return inStockVar || initialCache.variants[0];
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(!initialCache && !!id);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number>(initialCache?.product?.moq || 1);
   const [addedToCart, setAddedToCart] = useState(false);
   const [deliveryOpen, setDeliveryOpen] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [soldByOpen, setSoldByOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>(initialCache?.related ?? []);
   const [addedToast, setAddedToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
 
-    const loadProductAndVariants = async () => {
-      try {
-        const { data: prodData } = await supabase
-          .from('products')
-          .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
-          .eq('product_id', id)
-          .single();
+    const cacheKey = CACHE_KEYS.PRODUCT_DETAIL(id);
+    const cached = cacheService.get<{ product: any; variants: any[]; related: any[] }>(cacheKey, true);
+    if (!cached) {
+      setLoading(true);
+    }
 
-        if (prodData) {
-          setProduct(prodData);
-          setQuantity(prodData.moq || 1);
+    cacheService
+      .fetchWithCache(
+        cacheKey,
+        async () => {
+          const { data: prodData } = await supabase
+            .from('products')
+            .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+            .eq('product_id', id)
+            .single();
+
+          if (!prodData) return null;
 
           // Fetch variants for this product
           const { data: varData } = await supabase
@@ -62,19 +92,9 @@ export function ProductDetailPage() {
             .order('selling_price', { ascending: true });
 
           const varList = varData ?? [];
-          setVariants(varList);
-
-          if (varList.length > 0) {
-            // Select first variant, preferring in-stock item
-            const inStockVar = varList.find(
-              (v: any) => v.stock_quantity === true || (v.stock_quantity as any) > 0
-            );
-            setSelectedVariant(inStockVar || varList[0]);
-          } else {
-            setSelectedVariant(null);
-          }
 
           // Fetch related products
+          let relList: any[] = [];
           if (prodData.category_id) {
             const { data: rel } = await supabase
               .from('products')
@@ -85,17 +105,46 @@ export function ProductDetailPage() {
               .neq('product_id', id)
               .limit(8);
 
-            setRelatedProducts(rel ?? []);
+            relList = rel ?? [];
           }
-        }
-      } catch (err) {
-        console.error('Error loading product details:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    loadProductAndVariants();
+          return { product: prodData, variants: varList, related: relList };
+        },
+        {
+          ttl: CACHE_TTL.SHORT,
+          onBackgroundUpdate: (fresh) => {
+            if (fresh) {
+              setProduct(fresh.product);
+              setVariants(fresh.variants);
+              if (fresh.variants.length > 0) {
+                const inStockVar = fresh.variants.find(
+                  (v: any) => v.stock_quantity === true || (v.stock_quantity as any) > 0
+                );
+                setSelectedVariant(inStockVar || fresh.variants[0]);
+              }
+              setRelatedProducts(fresh.related);
+              setLoading(false);
+            }
+          },
+        }
+      )
+      .then((fresh) => {
+        if (fresh) {
+          setProduct(fresh.product);
+          setQuantity(fresh.product.moq || 1);
+          setVariants(fresh.variants);
+          if (fresh.variants.length > 0) {
+            const inStockVar = fresh.variants.find(
+              (v: any) => v.stock_quantity === true || (v.stock_quantity as any) > 0
+            );
+            setSelectedVariant(inStockVar || fresh.variants[0]);
+          } else {
+            setSelectedVariant(null);
+          }
+          setRelatedProducts(fresh.related);
+        }
+        setLoading(false);
+      });
   }, [id]);
 
   useEffect(() => {
@@ -185,18 +234,45 @@ export function ProductDetailPage() {
         </div>
       )}
 
-      {/* Mobile Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 lg:hidden">
-        <div className="flex items-center gap-2 px-3 py-2.5">
+      {/* Top Header Bar with Back Button, Search Bar, and Cart Button */}
+      <div className="sticky top-0 z-30 bg-[#e2f1fc] border-b border-sky-200/70 shadow-xs">
+        <div className="max-w-7xl mx-auto px-3 py-2 flex items-center gap-2.5">
+          {/* Back Button */}
           <button
+            type="button"
             onClick={() => navigate(-1)}
-            className="p-1.5 hover:bg-gray-100 rounded-lg cursor-pointer"
+            className="p-1.5 -ml-1 text-gray-800 hover:text-black hover:bg-black/5 rounded-full transition-colors shrink-0 cursor-pointer"
+            aria-label="Back"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
+            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
           </button>
-          <h1 className="flex-1 text-sm font-bold text-gray-900 truncate">{product.name}</h1>
-          <Link to="/cart" className="p-2 relative">
-            <ShoppingCart className="w-5 h-5 text-gray-700" />
+
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="flex-1 min-w-0">
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none stroke-[2]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search for products"
+                className="w-full pl-9 pr-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm bg-white text-gray-800 placeholder:text-gray-500 border border-sky-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 focus:outline-none transition-all shadow-xs"
+              />
+            </div>
+          </form>
+
+          {/* Cart Button */}
+          <Link
+            to="/cart"
+            className="p-1.5 text-gray-800 hover:text-black hover:bg-black/5 rounded-full transition-colors relative shrink-0 flex items-center justify-center cursor-pointer"
+            aria-label="Shopping Cart"
+          >
+            <ShoppingCart className="w-6 h-6 stroke-[1.9] text-gray-800" />
+            {totalCartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none shadow-xs border border-white">
+                {totalCartCount > 99 ? '99+' : totalCartCount}
+              </span>
+            )}
           </Link>
         </div>
       </div>

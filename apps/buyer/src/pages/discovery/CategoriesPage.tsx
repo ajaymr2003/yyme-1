@@ -4,6 +4,7 @@ import { supabase } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { getCategoryIcon } from '../../components/CategoryIcons';
 import { formatINR } from '@ymenet/utils';
+import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
 import {
   ArrowLeft,
   Search,
@@ -21,13 +22,23 @@ export function CategoriesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { items: cartItems } = useCart();
 
-  const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>(
     searchParams.get('category') || 'for-you'
   );
-  const [products, setProducts] = useState<any[]>([]);
-  const [popularStores, setPopularStores] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<any[]>(() => {
+    return cacheService.get<any[]>(CACHE_KEYS.CATEGORIES_ALL, true)?.data || [];
+  });
+  const [products, setProducts] = useState<any[]>(() => {
+    const cat = searchParams.get('category') || 'for-you';
+    return cacheService.get<any[]>(CACHE_KEYS.CATEGORY_PRODUCTS(cat), true)?.data || [];
+  });
+  const [popularStores, setPopularStores] = useState<any[]>(() => {
+    return cacheService.get<any[]>('yyme_buyer_popular_stores', true)?.data || [];
+  });
+  const [loading, setLoading] = useState(() => {
+    const cat = searchParams.get('category') || 'for-you';
+    return !cacheService.get<any[]>(CACHE_KEYS.CATEGORY_PRODUCTS(cat), true);
+  });
 
   // Sync category param with state
   useEffect(() => {
@@ -37,85 +48,100 @@ export function CategoriesPage() {
     }
   }, [searchParams]);
 
-  // Fetch all categories
+  // Fetch all categories with 15-min cache
   useEffect(() => {
-    supabase
-      .from('categories')
-      .select('*')
-      .order('display_order')
-      .then(({ data }) => {
-        setCategories(data ?? []);
-      });
+    cacheService
+      .fetchWithCache(
+        CACHE_KEYS.CATEGORIES_ALL,
+        async () => {
+          const { data } = await supabase.from('categories').select('*').order('display_order');
+          return data ?? [];
+        },
+        { ttl: CACHE_TTL.LONG, onBackgroundUpdate: (fresh) => setCategories(fresh) }
+      )
+      .then((data) => setCategories(data));
 
-    // Fetch popular sellers
-    supabase
-      .from('sellers')
-      .select('seller_id, business_name')
-      .limit(6)
-      .then(({ data }) => {
-        setPopularStores(data ?? []);
-      });
+    // Fetch popular sellers with cache
+    cacheService
+      .fetchWithCache(
+        'yyme_buyer_popular_stores',
+        async () => {
+          const { data } = await supabase.from('sellers').select('seller_id, business_name').limit(6);
+          return data ?? [];
+        },
+        { ttl: CACHE_TTL.SHORT, onBackgroundUpdate: (fresh) => setPopularStores(fresh) }
+      )
+      .then((data) => setPopularStores(data));
   }, []);
 
-  // Fetch products based on selected category
+  // Fetch products based on selected category with SWR
   useEffect(() => {
-    setLoading(true);
+    const cacheKey = CACHE_KEYS.CATEGORY_PRODUCTS(selectedCategory);
+    const cached = cacheService.get<any[]>(cacheKey, true);
+    if (!cached) {
+      setLoading(true);
+    }
 
-    if (selectedCategory === 'for-you') {
-      // Fetch featured products for "For You"
-      supabase
-        .from('products')
-        .select('*, seller:sellers(seller_id, business_name), category:categories(name)')
-        .eq('is_active', true)
-        .eq('qc_status', 'verified')
-        .order('created_at', { ascending: false })
-        .limit(18)
-        .then(({ data }) => {
-          setProducts(data ?? []);
-          setLoading(false);
-        });
-    } else {
-      // Find all descendant IDs of selected category
-      const targetCategory = categories.find((c) => c.category_id === selectedCategory);
-      if (!targetCategory) {
-        setLoading(false);
-        return;
-      }
-
-      const childCategoryIds = categories
-        .filter((c) => c.parent_category_id === selectedCategory)
-        .map((c) => c.category_id);
-
-      const allIds = [selectedCategory, ...childCategoryIds];
-
-      supabase
-        .from('products')
-        .select('*, seller:sellers(seller_id, business_name), category:categories(name)')
-        .eq('is_active', true)
-        .eq('qc_status', 'verified')
-        .in('category_id', allIds)
-        .order('created_at', { ascending: false })
-        .limit(24)
-        .then(({ data }) => {
-          // If no verified products in this specific category, fetch fallback
-          if (!data || data.length === 0) {
-            supabase
+    cacheService
+      .fetchWithCache(
+        cacheKey,
+        async () => {
+          if (selectedCategory === 'for-you') {
+            const { data } = await supabase
               .from('products')
               .select('*, seller:sellers(seller_id, business_name), category:categories(name)')
               .eq('is_active', true)
               .eq('qc_status', 'verified')
               .order('created_at', { ascending: false })
-              .limit(12)
-              .then(({ data: fallbackData }) => {
-                setProducts(fallbackData ?? []);
-                setLoading(false);
-              });
+              .limit(18);
+            return data ?? [];
           } else {
-            setProducts(data);
-            setLoading(false);
+            const targetCategory = categories.find((c) => c.category_id === selectedCategory);
+            if (!targetCategory && categories.length > 0) {
+              return [];
+            }
+
+            const childCategoryIds = categories
+              .filter((c) => c.parent_category_id === selectedCategory)
+              .map((c) => c.category_id);
+
+            const allIds = [selectedCategory, ...childCategoryIds];
+
+            const { data } = await supabase
+              .from('products')
+              .select('*, seller:sellers(seller_id, business_name), category:categories(name)')
+              .eq('is_active', true)
+              .eq('qc_status', 'verified')
+              .in('category_id', allIds)
+              .order('created_at', { ascending: false })
+              .limit(24);
+
+            if (!data || data.length === 0) {
+              const { data: fallbackData } = await supabase
+                .from('products')
+                .select('*, seller:sellers(seller_id, business_name), category:categories(name)')
+                .eq('is_active', true)
+                .eq('qc_status', 'verified')
+                .order('created_at', { ascending: false })
+                .limit(12);
+              return fallbackData ?? [];
+            }
+
+            return data;
           }
-        });
-    }
+        },
+        {
+          ttl: CACHE_TTL.DYNAMIC,
+          onBackgroundUpdate: (fresh) => {
+            setProducts(fresh);
+            setLoading(false);
+          },
+        }
+      )
+      .then((data) => {
+        setProducts(data);
+        setLoading(false);
+      });
   }, [selectedCategory, categories]);
 
   const l1Categories = categories.filter((c) => c.level === 1);

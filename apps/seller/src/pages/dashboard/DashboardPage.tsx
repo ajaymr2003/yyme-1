@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSellerAuth, supabase } from '../../core/contexts/SellerAuthContext';
 import { useQuota } from '../../core/contexts/QuotaContext';
 import { formatINR } from '@ymenet/utils';
+import { getCached, setCache, CACHE_TTL } from '../../core/cache';
 import { BarChart3, Package, Zap, MessageCircle, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 
 export function DashboardPage() {
@@ -13,17 +14,26 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!sellerProfile) return;
-    supabase.from('whatsapp_click_logs')
+    const sid = sellerProfile.seller_id;
+    const clicksKey = `seller:clicks:${sid}`;
+    const countKey = `seller:clicks_count:${sid}`;
+
+    const cachedClicks = getCached<any[]>(clicksKey, CACHE_TTL.MINUTE_1);
+    const cachedCount = getCached<number>(countKey, CACHE_TTL.MINUTE_1);
+
+    if (cachedClicks) setRecentClicks(cachedClicks);
+    else supabase.from('whatsapp_click_logs')
       .select('*, product:products(name)')
-      .eq('seller_id', sellerProfile.seller_id)
+      .eq('seller_id', sid)
       .order('clicked_at', { ascending: false })
       .limit(5)
-      .then(({ data }) => setRecentClicks(data ?? []));
+      .then(({ data }) => { const d = data ?? []; setRecentClicks(d); setCache(clicksKey, d); });
 
-    supabase.from('whatsapp_click_logs')
+    if (cachedCount !== null) setTotalClicks(cachedCount);
+    else supabase.from('whatsapp_click_logs')
       .select('log_id', { count: 'exact', head: true })
-      .eq('seller_id', sellerProfile.seller_id)
-      .then(({ count }) => setTotalClicks(count ?? 0));
+      .eq('seller_id', sid)
+      .then(({ count }) => { const c = count ?? 0; setTotalClicks(c); setCache(countKey, c); });
   }, [sellerProfile]);
 
   return (

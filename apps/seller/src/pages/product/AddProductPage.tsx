@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useSellerAuth, supabase } from '../../core/contexts/SellerAuthContext';
 import { useQuota } from '../../core/contexts/QuotaContext';
 import { CategorySelect, Category } from './CategorySelect';
+import { getCached, setCache, invalidateCachePrefix, CACHE_TTL } from '../../core/cache';
 import {
   ProductPricingAndVariants,
   VariantAxis,
@@ -170,6 +171,8 @@ export function AddProductPage() {
   // Fetch categories on mount
   useEffect(() => {
     async function fetchCategories() {
+      const cached = getCached<Category[]>('seller:categories', CACHE_TTL.HOUR);
+      if (cached) { setAllCategories(cached); return; }
       const { data, error } = await supabase
         .from('categories')
         .select('*')
@@ -178,7 +181,9 @@ export function AddProductPage() {
       if (error) {
         console.error('Error fetching categories:', error);
       } else if (data) {
-        setAllCategories(data as Category[]);
+        const cats = data as Category[];
+        setAllCategories(cats);
+        setCache('seller:categories', cats);
       }
     }
     fetchCategories();
@@ -628,6 +633,8 @@ export function AddProductPage() {
 
       refresh();
       clearDraft();
+      invalidateCachePrefix('seller:products');
+      invalidateCachePrefix(`seller:clicks_count`);
       navigate('/products');
     } catch (err: any) {
       console.error('Error saving product:', err);

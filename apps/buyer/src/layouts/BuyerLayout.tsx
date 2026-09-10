@@ -10,6 +10,8 @@ import { useCart } from '../core/contexts/CartContext';
 import { supabase } from '../core/contexts/AuthContext';
 import { getCategoryIcon } from '../components/CategoryIcons';
 
+import { cacheService, CACHE_KEYS, CACHE_TTL } from '../core/services/cacheService';
+
 export function BuyerLayout() {
   const { session, buyerProfile, signOut } = useAuth();
   const { items } = useCart();
@@ -21,7 +23,10 @@ export function BuyerLayout() {
   });
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>(() => {
+    const cached = cacheService.get<any[]>(CACHE_KEYS.CATEGORIES_L1, true);
+    return cached ? cached.data : [];
+  });
 
   const isAuthPage = location.pathname.startsWith('/login');
   const isProfilePage = location.pathname.startsWith('/profile');
@@ -32,8 +37,16 @@ export function BuyerLayout() {
   const isHome = location.pathname === '/';
 
   useEffect(() => {
-    supabase.from('categories').select('*').eq('level', 1).order('display_order')
-      .then(({ data }) => setCategories(data ?? []));
+    cacheService
+      .fetchWithCache(
+        CACHE_KEYS.CATEGORIES_L1,
+        async () => {
+          const { data } = await supabase.from('categories').select('*').eq('level', 1).order('display_order');
+          return data ?? [];
+        },
+        { ttl: CACHE_TTL.LONG, onBackgroundUpdate: (fresh) => setCategories(fresh) }
+      )
+      .then((data) => setCategories(data));
   }, []);
 
   useEffect(() => {

@@ -5,22 +5,37 @@ import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import { ShoppingCart, Store, CheckCircle } from 'lucide-react';
 
+import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
+
 export function ShopPage() {
   const { categoryId } = useParams();
   const { addItem } = useCart();
-  const [categories, setCategories] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>(() => {
+    return cacheService.get<any[]>(CACHE_KEYS.CATEGORIES_ALL, true)?.data || [];
+  });
+  const [products, setProducts] = useState<any[]>(() => {
+    const key = CACHE_KEYS.SHOP_PRODUCTS(categoryId || 'all');
+    return cacheService.get<any[]>(key, true)?.data || [];
+  });
   const [curatedFallback, setCuratedFallback] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const key = CACHE_KEYS.SHOP_PRODUCTS(categoryId || 'all');
+    return !cacheService.get<any[]>(key, true);
+  });
   const [addedToast, setAddedToast] = useState<string | null>(null);
 
-  // Fetch all categories
+  // Fetch all categories with 15-min cache
   useEffect(() => {
-    supabase
-      .from('categories')
-      .select('*')
-      .order('display_order')
-      .then(({ data }) => setCategories(data ?? []));
+    cacheService
+      .fetchWithCache(
+        CACHE_KEYS.CATEGORIES_ALL,
+        async () => {
+          const { data } = await supabase.from('categories').select('*').order('display_order');
+          return data ?? [];
+        },
+        { ttl: CACHE_TTL.LONG, onBackgroundUpdate: (fresh) => setCategories(fresh) }
+      )
+      .then((data) => setCategories(data));
   }, []);
 
   // Recursively collect all descendant category IDs (L1, L2, L3)
@@ -37,41 +52,64 @@ export function ShopPage() {
     return result;
   };
 
-  // Fetch verified products for the selected category
+  // Fetch verified products for the selected category with SWR caching
   useEffect(() => {
     if (categories.length === 0) return;
-    setLoading(true);
 
-    let query = supabase
-      .from('products')
-      .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
-      .eq('is_active', true)
-      .eq('qc_status', 'verified');
-
-    if (categoryId) {
-      const allTargetIds = getDescendantIds(categoryId);
-      query = query.in('category_id', allTargetIds);
+    const cacheKey = CACHE_KEYS.SHOP_PRODUCTS(categoryId || 'all');
+    const cached = cacheService.get<any[]>(cacheKey, true);
+    if (!cached) {
+      setLoading(true);
     }
 
-    query
-      .order('created_at', { ascending: false })
-      .limit(40)
-      .then(({ data }) => {
-        setProducts(data ?? []);
+    cacheService
+      .fetchWithCache(
+        cacheKey,
+        async () => {
+          let query = supabase
+            .from('products')
+            .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+            .eq('is_active', true)
+            .eq('qc_status', 'verified');
+
+          if (categoryId) {
+            const allTargetIds = getDescendantIds(categoryId);
+            query = query.in('category_id', allTargetIds);
+          }
+
+          const { data } = await query.order('created_at', { ascending: false }).limit(40);
+          return data ?? [];
+        },
+        {
+          ttl: CACHE_TTL.DYNAMIC,
+          onBackgroundUpdate: (fresh) => {
+            setProducts(fresh);
+            setLoading(false);
+          },
+        }
+      )
+      .then((data) => {
+        setProducts(data);
         setLoading(false);
       });
 
-    // Curated fallback in case newly created category has 0 verified listings yet
-    supabase
-      .from('products')
-      .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
-      .eq('is_active', true)
-      .eq('qc_status', 'verified')
-      .order('created_at', { ascending: false })
-      .limit(12)
-      .then(({ data }) => {
-        setCuratedFallback(data ?? []);
-      });
+    // Curated fallback cached
+    cacheService
+      .fetchWithCache(
+        'yyme_buyer_curated_fallback',
+        async () => {
+          const { data } = await supabase
+            .from('products')
+            .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+            .eq('is_active', true)
+            .eq('qc_status', 'verified')
+            .order('created_at', { ascending: false })
+            .limit(12);
+          return data ?? [];
+        },
+        { ttl: CACHE_TTL.SHORT }
+      )
+      .then((data) => setCuratedFallback(data));
   }, [categoryId, categories]);
 
   const showAddedToast = (name: string) => {

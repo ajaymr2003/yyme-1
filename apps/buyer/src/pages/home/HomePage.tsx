@@ -32,34 +32,77 @@ const COLLECTIONS = [
   { title: 'Festive Season Showcase', description: 'Special seasonal offers directly from verified Indian makers', tag: 'Festive Deals', color: 'from-amber-700 to-emerald-800', link: '/shop' },
 ];
 
+import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
+
 export function HomePage() {
   const { addItem } = useCart();
-  const [banners, setBanners] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [banners, setBanners] = useState<any[]>(() => {
+    return cacheService.get<any[]>(CACHE_KEYS.BANNERS, true)?.data || [];
+  });
+  const [categories, setCategories] = useState<any[]>(() => {
+    return cacheService.get<any[]>(CACHE_KEYS.CATEGORIES_L1, true)?.data || [];
+  });
+  const [allProducts, setAllProducts] = useState<any[]>(() => {
+    return cacheService.get<any[]>(CACHE_KEYS.FEATURED_PRODUCTS, true)?.data || [];
+  });
   const [activeTab, setActiveTab] = useState<'trending' | 'new' | 'best'>('trending');
   const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
-  const [sellers, setSellers] = useState<any[]>([]);
+  const [sellers, setSellers] = useState<any[]>(() => {
+    return cacheService.get<any[]>(CACHE_KEYS.ACTIVE_SELLERS, true)?.data || [];
+  });
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [addedToast, setAddedToast] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from('banners').select('*').eq('is_active', true).order('display_order')
-      .then(({ data }) => setBanners(data ?? []));
+    // 1. Banners with cache
+    cacheService.fetchWithCache(
+      CACHE_KEYS.BANNERS,
+      async () => {
+        const { data } = await supabase.from('banners').select('*').eq('is_active', true).order('display_order');
+        return data ?? [];
+      },
+      { ttl: CACHE_TTL.MEDIUM, onBackgroundUpdate: (fresh) => setBanners(fresh) }
+    ).then((data) => setBanners(data));
 
-    supabase.from('categories').select('*').order('display_order')
-      .then(({ data }) => setCategories((data ?? []).filter((c: any) => c.level === 1)));
+    // 2. Categories with cache
+    cacheService.fetchWithCache(
+      CACHE_KEYS.CATEGORIES_L1,
+      async () => {
+        const { data } = await supabase.from('categories').select('*').order('display_order');
+        return (data ?? []).filter((c: any) => c.level === 1);
+      },
+      { ttl: CACHE_TTL.LONG, onBackgroundUpdate: (fresh) => setCategories(fresh) }
+    ).then((data) => setCategories(data));
 
-    supabase.from('products')
-      .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
-      .eq('is_active', true).eq('qc_status', 'verified')
-      .order('created_at', { ascending: false }).limit(24)
-      .then(({ data }) => setAllProducts(data ?? []));
+    // 3. Featured Products with cache
+    cacheService.fetchWithCache(
+      CACHE_KEYS.FEATURED_PRODUCTS,
+      async () => {
+        const { data } = await supabase
+          .from('products')
+          .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+          .eq('is_active', true)
+          .eq('qc_status', 'verified')
+          .order('created_at', { ascending: false })
+          .limit(24);
+        return data ?? [];
+      },
+      { ttl: CACHE_TTL.SHORT, onBackgroundUpdate: (fresh) => setAllProducts(fresh) }
+    ).then((data) => setAllProducts(data));
 
-    supabase.from('sellers')
-      .select('seller_id, business_name, account_status')
-      .eq('account_status', 'active').limit(6)
-      .then(({ data }) => setSellers(data ?? []));
+    // 4. Active Sellers with cache
+    cacheService.fetchWithCache(
+      CACHE_KEYS.ACTIVE_SELLERS,
+      async () => {
+        const { data } = await supabase
+          .from('sellers')
+          .select('seller_id, business_name, account_status')
+          .eq('account_status', 'active')
+          .limit(6);
+        return data ?? [];
+      },
+      { ttl: CACHE_TTL.SHORT, onBackgroundUpdate: (fresh) => setSellers(fresh) }
+    ).then((data) => setSellers(data));
   }, []);
 
   useEffect(() => {
