@@ -85,7 +85,11 @@ export function BannerManager() {
     const ext = uploadFile.name.split('.').pop() || 'jpg';
     const filePath = `banners/${Date.now()}.${ext}`;
     const { data, error } = await supabase.storage.from('payment-receipts').upload(filePath, uploadFile);
-    if (error || !data) return null;
+    if (error || !data) {
+      console.error('Upload image error:', error);
+      alert(`Failed to upload image: ${error?.message || 'Storage error'}`);
+      return null;
+    }
     const { data: urlData } = supabase.storage.from('payment-receipts').getPublicUrl(filePath);
     return urlData.publicUrl;
   }
@@ -94,40 +98,72 @@ export function BannerManager() {
     if (!title.trim()) return;
     setSaving(true);
 
-    const finalImageUrl = await uploadImage();
-    if (!finalImageUrl) {
+    try {
+      const finalImageUrl = await uploadImage();
+      if (!finalImageUrl) {
+        setSaving(false);
+        return;
+      }
+
+      const payload = {
+        title: title.trim(),
+        image_url: finalImageUrl,
+        display_order: parseInt(displayOrder) || 0,
+      };
+
+      if (editingBanner) {
+        const { error } = await supabase
+          .from('banners')
+          .update(payload)
+          .eq('banner_id', editingBanner.banner_id);
+
+        if (error) {
+          console.error('Update banner error:', error);
+          alert(`Failed to update banner: ${error.message}`);
+          setSaving(false);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from('banners')
+          .insert([{ ...payload, is_active: true }]);
+
+        if (error) {
+          console.error('Insert banner error:', error);
+          alert(`Failed to create banner: ${error.message}`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      setShowAddModal(false);
+      invalidateCache(CACHE_KEY);
+      fetchBanners(true);
+    } catch (err: any) {
+      console.error('Error in handleSave:', err);
+      alert(`Unexpected error: ${err?.message || 'Failed to save banner'}`);
+    } finally {
       setSaving(false);
-      return;
     }
-
-    if (editingBanner) {
-      await supabase.from('banners').update({
-        title: title.trim(), image_url: finalImageUrl,
-        link_url: linkUrl.trim() || null, display_order: parseInt(displayOrder) || 0,
-      }).eq('banner_id', editingBanner.banner_id);
-    } else {
-      await supabase.from('banners').insert([{
-        title: title.trim(), image_url: finalImageUrl,
-        link_url: linkUrl.trim() || null, display_order: parseInt(displayOrder) || 0,
-        is_active: true,
-      }]);
-    }
-
-    setShowAddModal(false);
-    invalidateCache(CACHE_KEY);
-    fetchBanners(true);
-    setSaving(false);
   }
 
   async function toggleActive(banner: Banner) {
-    await supabase.from('banners').update({ is_active: !banner.is_active }).eq('banner_id', banner.banner_id);
+    const { error } = await supabase.from('banners').update({ is_active: !banner.is_active }).eq('banner_id', banner.banner_id);
+    if (error) {
+      alert(`Failed to update banner status: ${error.message}`);
+      return;
+    }
     invalidateCache(CACHE_KEY);
     fetchBanners(true);
   }
 
   async function handleDelete(bannerId: string) {
     if (!confirm('Delete this banner?')) return;
-    await supabase.from('banners').delete().eq('banner_id', bannerId);
+    const { error } = await supabase.from('banners').delete().eq('banner_id', bannerId);
+    if (error) {
+      alert(`Failed to delete banner: ${error.message}`);
+      return;
+    }
     invalidateCache(CACHE_KEY);
     fetchBanners(true);
   }

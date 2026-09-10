@@ -157,6 +157,11 @@ export function ProductDetailPage() {
     window.scrollTo(0, 0);
   }, [id]);
 
+  // Reset active image index when selected variant changes
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedVariant]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -185,11 +190,6 @@ export function ProductDetailPage() {
   const allImages = variantImages.length > 0
     ? [...variantImages, ...productImages.filter((u: string) => !variantImages.includes(u))]
     : productImages;
-
-  // Reset active image index when selected variant changes
-  useEffect(() => {
-    setActiveImageIndex(0);
-  }, [selectedVariant]);
 
   const handlePrevImage = () => {
     if (allImages.length <= 1) return;
