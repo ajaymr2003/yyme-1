@@ -343,6 +343,7 @@ export function CategoriesPage() {
                       <Link
                         key={p.product_id}
                         to={`/product/${p.product_id}`}
+                        state={{ product: p }}
                         className="flex flex-col items-center group cursor-pointer"
                       >
                         <div className="w-full relative aspect-[4/5] rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200/60 shadow-2xs">
@@ -407,6 +408,7 @@ export function CategoriesPage() {
                       <Link
                         key={p.product_id}
                         to={`/product/${p.product_id}`}
+                        state={{ product: p }}
                         className="flex flex-col group cursor-pointer"
                       >
                         <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200/60 shadow-2xs">
@@ -526,6 +528,7 @@ export function CategoriesPage() {
                         <Link
                           key={p.product_id}
                           to={`/product/${p.product_id}`}
+                          state={{ product: p }}
                           className="flex flex-col group cursor-pointer"
                         >
                           <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200/60 shadow-2xs">

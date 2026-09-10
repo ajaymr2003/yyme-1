@@ -157,6 +157,7 @@ export function ShopPage() {
                 <Link
                   key={p.product_id}
                   to={`/product/${p.product_id}`}
+                  state={{ product: p }}
                   className="flex flex-col group cursor-pointer"
                 >
                   {/* Portrait aspect ratio container with rating badge */}
@@ -195,15 +196,14 @@ export function ShopPage() {
 
                   {/* Details below image */}
                   <div className="pt-1.5 px-0.5">
-                    {/* Line 1: Brand/Seller bold + Product title lighter */}
-                    <div className="flex items-baseline gap-1 text-[11px] sm:text-xs leading-tight">
-                      <span className="font-bold text-neutral-900 shrink-0">
-                        {brandOrSeller}
-                      </span>
-                      <span className="text-neutral-500 font-normal truncate">
-                        {p.name}
-                      </span>
-                    </div>
+                    {/* Brand/Seller line */}
+                    <span className="block text-[10px] sm:text-[11px] font-bold text-neutral-900 uppercase tracking-tight truncate">
+                      {brandOrSeller}
+                    </span>
+                    {/* Product Name in two lines */}
+                    <h3 className="text-[11px] sm:text-xs text-neutral-600 font-normal line-clamp-2 leading-snug mt-0.5">
+                      {p.name}
+                    </h3>
 
                     {/* Line 2: Prices: strikethrough MRP first, then bold final price */}
                     <div className="mt-0.5 flex items-baseline justify-between gap-1 text-[11.5px] sm:text-xs">

@@ -74,7 +74,7 @@ export function SearchPage() {
 
               return (
                 <div key={p.product_id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col group">
-                  <div onClick={() => navigate(`/product/${p.product_id}`)} className="relative aspect-square bg-neutral-100 overflow-hidden cursor-pointer">
+                  <div onClick={() => navigate(`/product/${p.product_id}`, { state: { product: p } })} className="relative aspect-square bg-neutral-100 overflow-hidden cursor-pointer">
                     {p.image_urls?.[0] ? (
                       <img
                         src={p.image_urls[0]}
@@ -101,7 +101,7 @@ export function SearchPage() {
                   <div className="p-3 flex-1 flex flex-col justify-between">
                     <div>
                       <span className="text-[10px] text-emerald-700 font-bold uppercase">{p.category?.name || 'Handicraft'}</span>
-                      <h3 onClick={() => navigate(`/product/${p.product_id}`)} className="text-xs sm:text-sm font-bold text-neutral-900 line-clamp-2 mt-0.5 cursor-pointer hover:text-emerald-700">{p.name}</h3>
+                      <h3 onClick={() => navigate(`/product/${p.product_id}`, { state: { product: p } })} className="text-xs sm:text-sm font-bold text-neutral-900 line-clamp-2 mt-0.5 cursor-pointer hover:text-emerald-700">{p.name}</h3>
                       <p className="text-[11px] text-neutral-500 mt-1 flex items-center gap-1"><Store className="w-3 h-3" />{p.seller?.business_name || 'Verified Artisan'}</p>
                     </div>
                     <div className="pt-2 border-t border-neutral-100 mt-2">

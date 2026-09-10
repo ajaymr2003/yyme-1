@@ -126,7 +126,7 @@ export const SellerStorefront: React.FC = () => {
               <div
                 key={p.product_id}
                 className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col group cursor-pointer"
-                onClick={() => navigate(`/product/${p.product_id}`)}
+                onClick={() => navigate(`/product/${p.product_id}`, { state: { product: p } })}
               >
                 <div className="relative aspect-square bg-neutral-100 overflow-hidden">
                   {p.image_urls?.[0] ? (
