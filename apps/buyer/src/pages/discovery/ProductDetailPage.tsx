@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
@@ -37,6 +37,12 @@ export function ProductDetailPage() {
   };
 
   const totalCartCount = items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0;
+
+  // Swipe & Drag refs for interactive image sliding
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const mouseStartX = useRef<number | null>(null);
+  const didSwipe = useRef(false);
 
   // Initialize synchronously from cache if present (eliminates loading spinner!)
   const initialCache = id ? cacheService.get<{ product: any; variants: any[]; related: any[] }>(CACHE_KEYS.PRODUCT_DETAIL(id), true)?.data : null;
@@ -180,6 +186,66 @@ export function ProductDetailPage() {
     ? [...variantImages, ...productImages.filter((u: string) => !variantImages.includes(u))]
     : productImages;
 
+  // Reset active image index when selected variant changes
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedVariant]);
+
+  const handlePrevImage = () => {
+    if (allImages.length <= 1) return;
+    setActiveImageIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = () => {
+    if (allImages.length <= 1) return;
+    setActiveImageIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    didSwipe.current = false;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = touchStartX.current - e.changedTouches[0].clientX;
+    const deltaY = touchStartY.current - e.changedTouches[0].clientY;
+
+    if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      didSwipe.current = true;
+      if (deltaX > 0) {
+        handleNextImage();
+      } else {
+        handlePrevImage();
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    mouseStartX.current = e.clientX;
+    didSwipe.current = false;
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (mouseStartX.current === null) return;
+    const deltaX = mouseStartX.current - e.clientX;
+    if (Math.abs(deltaX) > 35) {
+      didSwipe.current = true;
+      if (deltaX > 0) {
+        handleNextImage();
+      } else {
+        handlePrevImage();
+      }
+    }
+    mouseStartX.current = null;
+    setTimeout(() => {
+      didSwipe.current = false;
+    }, 100);
+  };
+
   const displayPrice = selectedVariant?.selling_price ?? selectedVariant?.price ?? product.base_price;
   const displayMrp = selectedVariant?.mrp ?? product.mrp ?? 0;
 
@@ -247,7 +313,7 @@ export function ProductDetailPage() {
             <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
           </button>
 
-          {/* Search Bar */}
+          {/* Search Bar with Green Border and Green Shadow */}
           <form onSubmit={handleSearch} className="flex-1 min-w-0">
             <div className="relative flex items-center">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none stroke-[2]" />
@@ -256,7 +322,7 @@ export function ProductDetailPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search for products"
-                className="w-full pl-9 pr-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm bg-white text-gray-800 placeholder:text-gray-500 border border-sky-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-200 focus:outline-none transition-all shadow-xs"
+                className="w-full pl-9 pr-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm bg-white text-gray-800 placeholder:text-gray-500 border border-[#166534] focus:border-[#166534] focus:ring-2 focus:ring-[#166534]/25 focus:outline-none transition-all shadow-[0_2px_12px_rgba(22,101,52,0.18)]"
               />
             </div>
           </form>
@@ -278,20 +344,46 @@ export function ProductDetailPage() {
       </div>
 
       <div className="max-w-[900px] mx-auto">
-        {/* Gallery Section */}
-        <div className="relative bg-white">
-          <div
-            className="w-full h-[340px] sm:h-[440px] cursor-zoom-in overflow-hidden flex items-center justify-center bg-neutral-50/50"
-            onClick={() => setIsFullScreen(true)}
-          >
-            {allImages[activeImageIndex] ? (
-              <img
-                src={allImages[activeImageIndex]}
-                alt={product.name}
-                className={`w-full h-full object-contain transition-opacity duration-200 ${!isInStock ? 'opacity-70' : 'opacity-100'}`}
-              />
+        {/* Gallery Section with Smooth Horizontal Sliding Carousel */}
+        <div
+          className="relative bg-white select-none overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => {
+            mouseStartX.current = null;
+          }}
+        >
+          <div className="w-full h-[340px] sm:h-[440px] overflow-hidden bg-neutral-50/50">
+            {allImages.length > 0 ? (
+              <div
+                className="flex h-full w-full transition-transform duration-300 ease-out will-change-transform"
+                style={{ transform: `translateX(-${activeImageIndex * 100}%)` }}
+              >
+                {allImages.map((imgUrl: string, i: number) => (
+                  <div
+                    key={i}
+                    className="w-full h-full shrink-0 flex items-center justify-center cursor-zoom-in"
+                    onClick={() => {
+                      if (!didSwipe.current) setIsFullScreen(true);
+                    }}
+                  >
+                    <img
+                      src={imgUrl}
+                      alt={`${product.name} - ${i + 1}`}
+                      className={`w-full h-full object-contain pointer-events-none transition-opacity duration-200 ${
+                        !isInStock ? 'opacity-70' : 'opacity-100'
+                      }`}
+                      draggable={false}
+                    />
+                  </div>
+                ))}
+              </div>
             ) : (
-              <span className="text-6xl">📦</span>
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-6xl">📦</span>
+              </div>
             )}
           </div>
 
@@ -305,34 +397,44 @@ export function ProductDetailPage() {
           {allImages.length > 1 && (
             <>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setActiveImageIndex((p) => Math.max(0, p - 1));
+                  handlePrevImage();
                 }}
-                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white cursor-pointer transition-colors"
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-black/35 hover:bg-black/60 active:scale-95 text-white cursor-pointer transition-all flex items-center justify-center shadow-md"
+                aria-label="Previous image"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
               </button>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setActiveImageIndex((p) => Math.min(allImages.length - 1, p + 1));
+                  handleNextImage();
                 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white cursor-pointer transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-black/35 hover:bg-black/60 active:scale-95 text-white cursor-pointer transition-all flex items-center justify-center shadow-md"
+                aria-label="Next image"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5 stroke-[2.5]" />
               </button>
             </>
           )}
 
           {allImages.length > 1 && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/20 backdrop-blur-xs">
               {allImages.map((_: string, i: number) => (
-                <div
+                <button
                   key={i}
-                  className={`h-2 rounded-full transition-all ${
-                    i === activeImageIndex ? 'bg-emerald-600 w-5' : 'bg-white/70 w-2'
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveImageIndex(i);
+                  }}
+                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                    i === activeImageIndex ? 'bg-[#166534] w-5 shadow-xs' : 'bg-white/70 hover:bg-white w-2'
                   }`}
+                  aria-label={`Go to slide ${i + 1}`}
                 />
               ))}
             </div>

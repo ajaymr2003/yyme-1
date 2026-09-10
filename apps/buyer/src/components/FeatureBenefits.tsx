@@ -117,7 +117,7 @@ export function FeatureBenefits() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   return (
-    <section className="w-full relative z-20 -mt-14 sm:-mt-20 pb-4">
+    <section className="w-full relative z-20 -mt-10 sm:-mt-22 pb-4">
       <div className="max-w-[1360px] mx-auto px-3 sm:px-6 lg:px-8 relative">
         <div
           ref={scrollRef}
