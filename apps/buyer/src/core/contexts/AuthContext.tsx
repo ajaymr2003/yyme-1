@@ -5,12 +5,12 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export function getShadowCredentials(phone: string) {
-  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-  return {
-    email: `${cleanPhone}@buyer.yymee.com`,
-    password: `TempPass_${cleanPhone}_yymee`,
-  };
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function generateUUIDFromPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  const hex = digits.padStart(12, '0');
+  return `00000000-0000-4000-8000-${hex}`;
 }
 
 interface BuyerProfile {
@@ -25,9 +25,8 @@ interface AuthCtx {
   user: User | null;
   buyerProfile: BuyerProfile | null;
   loading: boolean;
-  loginWithPhone: (phone: string, otp: string) => Promise<void>;
-  signUpWithPhone: (name: string, email: string, phone: string) => Promise<void>;
-  confirmOtp: (phone: string, otp: string) => Promise<void>;
+  verifyOtp: (phone: string, otp: string) => Promise<{ isNewUser: boolean }>;
+  completeRegistration: (phone: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -35,28 +34,53 @@ const AuthContext = createContext<AuthCtx | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [buyerProfile, setBuyerProfile] = useState<BuyerProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check for saved bypass session first
+    const savedBypass = localStorage.getItem('yyme_buyer_bypass_session');
+    if (savedBypass) {
+      try {
+        const parsed = JSON.parse(savedBypass);
+        if (!parsed.user?.id || !UUID_REGEX.test(parsed.user.id)) {
+          const validId = generateUUIDFromPhone(parsed.user?.phone || parsed.user?.id || '9999999999');
+          parsed.user.id = validId;
+          if (parsed.session?.user) parsed.session.user.id = validId;
+          localStorage.setItem('yyme_buyer_bypass_session', JSON.stringify(parsed));
+        }
+        setSession(parsed.session);
+        setUser(parsed.user);
+        fetchBuyerProfile(parsed.user.id);
+        return;
+      } catch {}
+    }
+
+    // Check Supabase session as fallback
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
       if (session?.user) {
+        setSession(session);
+        setUser(session.user);
         fetchBuyerProfile(session.user.id);
       } else {
         setLoading(false);
       }
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        setSession(session);
+        setUser(session.user);
         fetchBuyerProfile(session.user.id);
       } else {
-        setBuyerProfile(null);
-        setLoading(false);
+        const saved = localStorage.getItem('yyme_buyer_bypass_session');
+        if (!saved) {
+          setSession(null);
+          setUser(null);
+          setBuyerProfile(null);
+          setLoading(false);
+        }
       }
     });
 
@@ -64,6 +88,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   async function fetchBuyerProfile(userId: string) {
+    if (!userId || !UUID_REGEX.test(userId)) {
+      userId = generateUUIDFromPhone(userId || '9999999999');
+    }
     try {
       const { data } = await supabase
         .from('buyers')
@@ -78,100 +105,115 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  async function signUpWithPhone(name: string, email: string, phone: string) {
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const { email: shadowEmail, password: shadowPassword } = getShadowCredentials(cleanPhone);
-    const finalEmail = email.trim() || shadowEmail;
+  function createMockSession(phone: string, userId: string) {
+    const formattedPhone = `+91${phone.replace(/\D/g, '').slice(-10)}`;
+    const email = `${phone.replace(/\D/g, '').slice(-10)}@ymenet.com`;
 
-    // 1. Sign up Supabase Auth user
-    let authUserId = '';
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: shadowEmail,
-      password: shadowPassword,
-    });
-
-    if (authError && authError.message?.toLowerCase().includes('already registered')) {
-      const signInRes = await supabase.auth.signInWithPassword({
-        email: shadowEmail,
-        password: shadowPassword,
-      });
-      if (signInRes.error) throw authError;
-      authUserId = signInRes.data.user?.id || '';
-    } else if (authError) {
-      throw authError;
-    } else {
-      authUserId = authData.user?.id || '';
-    }
-
-    if (!authUserId) {
-      throw new Error('Could not authenticate new user.');
-    }
-
-    // 2. Sign in to set session
-    await supabase.auth.signInWithPassword({
-      email: shadowEmail,
-      password: shadowPassword,
-    });
-
-    // 3. Upsert user in public.users
-    await supabase.from('users').upsert({
-      user_id: authUserId,
-      phone_number: `+91${cleanPhone}`,
-      email: finalEmail,
-      user_type: 'buyer',
-      is_active: true,
-      last_login_at: new Date().toISOString(),
-    });
-
-    // 4. Upsert buyer in public.buyers
-    await supabase.from('buyers').upsert({
-      user_id: authUserId,
-      full_name: name.trim(),
-    });
-
-    await fetchBuyerProfile(authUserId);
+    const mockUser: User = {
+      id: userId,
+      app_metadata: {},
+      user_metadata: { phone: formattedPhone },
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+      email,
+      phone: formattedPhone,
+      role: 'authenticated',
+      updated_at: new Date().toISOString(),
+    };
+    const mockSession: Session = {
+      access_token: 'bypass-token',
+      refresh_token: 'bypass-refresh',
+      expires_in: 3600,
+      token_type: 'bearer',
+      user: mockUser,
+    };
+    return { mockUser, mockSession };
   }
 
-  async function confirmOtp(phone: string, otp: string) {
-    await loginWithPhone(phone, otp);
-  }
-
-  async function loginWithPhone(phone: string, otp: string) {
+  async function verifyOtp(phone: string, otp: string): Promise<{ isNewUser: boolean }> {
     if (otp !== '123456') {
       throw new Error('Invalid OTP code. Please enter 123456.');
     }
 
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const { email, password } = getShadowCredentials(cleanPhone);
+    const formattedPhone = `+91${cleanPhone}`;
+    const email = `${cleanPhone}@ymenet.com`;
 
-    let { data, error } = await supabase.auth.signInWithPassword({
+    // 1. Check if user exists in DB
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('user_id')
+      .or(`phone_number.eq.${formattedPhone},phone_number.eq.${cleanPhone}`)
+      .maybeSingle();
+
+    let existingProfile: BuyerProfile | null = null;
+    if (existingUser?.user_id) {
+      const { data: b } = await supabase
+        .from('buyers')
+        .select('buyer_id, user_id, full_name, default_address_id')
+        .eq('user_id', existingUser.user_id)
+        .maybeSingle();
+      existingProfile = b;
+    }
+
+    // 2. If buyer profile exists, log in directly
+    if (existingProfile) {
+      const userId = existingProfile.user_id || generateUUIDFromPhone(cleanPhone);
+      const { mockUser, mockSession } = createMockSession(cleanPhone, userId);
+
+      setSession(mockSession);
+      setUser(mockUser);
+      setBuyerProfile(existingProfile);
+      localStorage.setItem('yyme_buyer_bypass_session', JSON.stringify({ user: mockUser, session: mockSession }));
+
+      // Update last login
+      await supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('user_id', userId);
+
+      return { isNewUser: false };
+    }
+
+    // 3. New user — need name
+    return { isNewUser: true };
+  }
+
+  async function completeRegistration(phone: string, name: string) {
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    const formattedPhone = `+91${cleanPhone}`;
+    const email = `${cleanPhone}@ymenet.com`;
+    const userId = generateUUIDFromPhone(cleanPhone);
+
+    // 1. Upsert public.users
+    await supabase.from('users').upsert({
+      user_id: userId,
+      phone_number: formattedPhone,
       email,
-      password,
-    });
+      user_type: 'buyer',
+      is_active: true,
+      last_login_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
 
-    let user = data?.user;
+    // 2. Upsert public.buyers
+    await supabase.from('buyers').upsert({
+      user_id: userId,
+      full_name: name.trim(),
+    }, { onConflict: 'user_id' });
 
-    if (error) {
-      // Auto-create in Auth if record exists in users
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (signUpError) throw error;
-      user = signUpData.user;
-    }
+    // 3. Create mock session
+    const { mockUser, mockSession } = createMockSession(cleanPhone, userId);
 
-    if (user) {
-      await supabase
-        .from('users')
-        .update({ last_login_at: new Date().toISOString() })
-        .eq('user_id', user.id);
-      await fetchBuyerProfile(user.id);
-    }
+    setSession(mockSession);
+    setUser(mockUser);
+    localStorage.setItem('yyme_buyer_bypass_session', JSON.stringify({ user: mockUser, session: mockSession }));
+
+    // 4. Fetch profile
+    await fetchBuyerProfile(userId);
   }
 
   async function signOut() {
+    localStorage.removeItem('yyme_buyer_bypass_session');
     await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
     setBuyerProfile(null);
   }
 
@@ -179,12 +221,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         session,
-        user: session?.user ?? null,
+        user,
         buyerProfile,
         loading,
-        loginWithPhone,
-        signUpWithPhone,
-        confirmOtp,
+        verifyOtp,
+        completeRegistration,
         signOut,
       }}
     >

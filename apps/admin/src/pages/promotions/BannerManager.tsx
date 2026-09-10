@@ -170,11 +170,12 @@ export function BannerManager() {
                 <tr key={banner.banner_id} className="border-b border-neutral-100 last:border-0">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-24 h-14 bg-neutral-100 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center">
+                      <button onClick={() => banner.image_url && setViewImage(banner.image_url)}
+                        className="w-24 h-14 bg-neutral-100 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center hover:ring-2 hover:ring-emerald-400 transition-all cursor-pointer">
                         {banner.image_url ? (
                           <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
                         ) : <Image className="w-5 h-5 text-neutral-300" />}
-                      </div>
+                      </button>
                       <p className="text-sm font-semibold text-neutral-900">{banner.title}</p>
                     </div>
                   </td>
@@ -189,9 +190,6 @@ export function BannerManager() {
                       {banner.is_active ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                       {banner.is_active ? 'Active' : 'Inactive'}
                     </button>
-                  </td>
-                  <td className="px-4 py-3 text-[10px] text-blue-600 max-w-[150px] truncate">
-                    {banner.link_url || '—'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
@@ -261,6 +259,19 @@ export function BannerManager() {
                 <Save className="w-4 h-4" /> {saving ? 'Saving...' : editingBanner ? 'Save Changes' : 'Add Banner'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Image Lightbox */}
+      {viewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setViewImage(null)}>
+          <div className="fixed inset-0 bg-neutral-900/80 backdrop-blur-sm" />
+          <div className="relative z-10 max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setViewImage(null)}
+              className="absolute -top-10 right-0 p-2 text-white/70 hover:text-white transition-colors">
+              <X className="w-6 h-6" />
+            </button>
+            <img src={viewImage} alt="Banner full view" className="w-full rounded-xl shadow-2xl object-contain max-h-[80vh]" />
           </div>
         </div>
       )}

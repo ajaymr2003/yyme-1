@@ -4,12 +4,14 @@ import { useAuth } from './core/contexts/AuthContext';
 import { BuyerLayout } from './layouts/BuyerLayout';
 import { HomePage } from './pages/home/HomePage';
 import { LoginPage } from './pages/auth/LoginPage';
-import { SignupPage } from './pages/auth/SignupPage';
 import { ShopPage } from './pages/discovery/ShopPage';
 import { SearchPage } from './pages/discovery/SearchPage';
+import { ProductDetailPage } from './pages/discovery/ProductDetailPage';
 import { CartPage } from './pages/cart/CartPage';
 import { CheckoutPage } from './pages/checkout/CheckoutPage';
-import { ProductDetailPage } from './pages/discovery/ProductDetailPage';
+import { ProfilePage } from './pages/account/ProfilePage';
+import { WishlistPage } from './pages/account/WishlistPage';
+import { AboutPage } from './pages/about/AboutPage';
 
 export function AppRoutes() {
   const { session, loading } = useAuth();
@@ -26,7 +28,6 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/" /> : <LoginPage />} />
-      <Route path="/signup" element={session ? <Navigate to="/" /> : <SignupPage />} />
       <Route element={<BuyerLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/shop" element={<ShopPage />} />
@@ -36,6 +37,9 @@ export function AppRoutes() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={session ? <CheckoutPage /> : <Navigate to="/login" />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/wishlist" element={<WishlistPage />} />
+        <Route path="/about" element={<AboutPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
