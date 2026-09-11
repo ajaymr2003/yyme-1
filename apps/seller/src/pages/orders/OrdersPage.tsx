@@ -250,50 +250,66 @@ export function OrdersPage() {
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between text-neutral-500 mb-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Total Orders</span>
-            <ShoppingBag className="w-4 h-4 text-neutral-400" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white border border-neutral-200 rounded-xl p-3 sm:p-4 shadow-xs">
+          <div className="flex items-center justify-between text-neutral-500 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Total Orders</span>
+            <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
           </div>
-          <p className="text-2xl font-black text-neutral-900">{totalCount}</p>
-          <p className="text-[11px] text-neutral-400 mt-0.5">{formatINR(totalRevenue)} total volume</p>
+          <p className="text-xl sm:text-2xl font-black text-neutral-900">{totalCount}</p>
+          <p className="text-[10.5px] sm:text-[11px] text-neutral-400 mt-0.5">{formatINR(totalRevenue)} volume</p>
         </div>
 
-        <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between text-amber-700 mb-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Initiated</span>
-            <Clock className="w-4 h-4 text-amber-600" />
+        <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-3 sm:p-4 shadow-xs">
+          <div className="flex items-center justify-between text-amber-700 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Initiated</span>
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
           </div>
-          <p className="text-2xl font-black text-amber-900">{initiatedCount}</p>
-          <p className="text-[11px] text-amber-700/80 mt-0.5">New buyer requests</p>
+          <p className="text-xl sm:text-2xl font-black text-amber-900">{initiatedCount}</p>
+          <p className="text-[10.5px] sm:text-[11px] text-amber-700/80 mt-0.5">New buyer requests</p>
         </div>
 
-        <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between text-blue-700 mb-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">In Progress</span>
-            <Truck className="w-4 h-4 text-blue-600" />
+        <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-3 sm:p-4 shadow-xs">
+          <div className="flex items-center justify-between text-blue-700 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">In Progress</span>
+            <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
           </div>
-          <p className="text-2xl font-black text-blue-900">{inProgressCount}</p>
-          <p className="text-[11px] text-blue-700/80 mt-0.5">Confirmed, packed, or shipped</p>
+          <p className="text-xl sm:text-2xl font-black text-blue-900">{inProgressCount}</p>
+          <p className="text-[10.5px] sm:text-[11px] text-blue-700/80 mt-0.5">Confirmed / packed</p>
         </div>
 
-        <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center justify-between text-emerald-700 mb-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Delivered</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 sm:p-4 shadow-xs">
+          <div className="flex items-center justify-between text-emerald-700 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Delivered</span>
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
           </div>
-          <p className="text-2xl font-black text-emerald-900">{deliveredCount}</p>
-          <p className="text-[11px] text-emerald-700/80 mt-0.5">Fulfilled orders</p>
+          <p className="text-xl sm:text-2xl font-black text-emerald-900">{deliveredCount}</p>
+          <p className="text-[10.5px] sm:text-[11px] text-emerald-700/80 mt-0.5">Fulfilled orders</p>
+        </div>
+      </div>
+
+      {/* WhatsApp Order Disclaimer Notice */}
+      <div className="bg-amber-50/75 border border-amber-200/80 rounded-xl p-3.5 sm:p-4 flex items-start gap-3 shadow-2xs">
+        <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg shrink-0 mt-0.5">
+          <AlertCircle className="w-4 h-4" />
+        </div>
+        <div className="text-xs text-amber-900 leading-relaxed space-y-0.5">
+          <div className="flex items-center gap-2">
+            <h4 className="font-bold text-amber-950">Important Order Disclaimer</h4>
+            <span className="text-[10px] font-bold bg-amber-200/70 text-amber-900 px-1.5 py-0.5 rounded-md">Notice</span>
+          </div>
+          <p className="text-amber-900/90 text-[11.5px] sm:text-xs">
+            When a buyer clicks <strong>"Buy Now"</strong>, the order is registered as <strong>Initiated</strong>. Please note that clicking "Buy Now" does not mean you will automatically receive an order request message on WhatsApp (the buyer may not have sent the message or may have closed WhatsApp). Always confirm details with the buyer before dispatching.
+          </p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-xs space-y-3">
+      <div className="bg-white border border-neutral-200 rounded-xl p-3.5 sm:p-4 shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
           
           {/* Status Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none -mx-1 px-1">
             {[
               { id: 'all', label: 'All Orders', count: totalCount },
               { id: 'initiated', label: 'Initiated', count: initiatedCount },
@@ -325,7 +341,7 @@ export function OrdersPage() {
           </div>
 
           {/* Search Box */}
-          <div className="relative min-w-[240px] md:w-72">
+          <div className="relative w-full md:w-72">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -338,7 +354,7 @@ export function OrdersPage() {
         </div>
       </div>
 
-      {/* Orders Table */}
+      {/* Orders Container */}
       <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-12 text-center">
@@ -356,122 +372,219 @@ export function OrdersPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-neutral-50/80 border-b border-neutral-200 text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                  <th className="py-3 px-4">Order ID & Date</th>
-                  <th className="py-3 px-4">Product Details</th>
-                  <th className="py-3 px-4">Buyer</th>
-                  <th className="py-3 px-4">Total Amount</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Update Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 text-xs">
-                {filteredOrders.map(order => {
-                  const displayId = getDisplayOrderId(order);
-                  const dateStr = (order.clicked_at || order.created_at)
-                    ? new Date(order.clicked_at || order.created_at!).toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    : 'N/A';
-                  
-                  const img = order.product_images?.[0];
-                  const currentStatus = (order.status || 'initiated').toLowerCase();
-                  const statusConf = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.initiated;
-                  const StatusIcon = statusConf.icon;
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-neutral-50/80 border-b border-neutral-200 text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Order ID & Date</th>
+                    <th className="py-3 px-4">Product Details</th>
+                    <th className="py-3 px-4">Buyer</th>
+                    <th className="py-3 px-4">Total Amount</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Update Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 text-xs">
+                  {filteredOrders.map(order => {
+                    const displayId = getDisplayOrderId(order);
+                    const dateStr = (order.clicked_at || order.created_at)
+                      ? new Date(order.clicked_at || order.created_at!).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : 'N/A';
+                    
+                    const img = order.product_images?.[0];
+                    const currentStatus = (order.status || 'initiated').toLowerCase();
+                    const statusConf = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.initiated;
+                    const StatusIcon = statusConf.icon;
 
-                  return (
-                    <tr key={order.order_id} className="hover:bg-neutral-50/60 transition-colors">
-                      {/* 1. Order ID & Date */}
-                      <td className="py-3.5 px-4 align-top">
-                        <span className="font-mono font-bold text-neutral-900 bg-neutral-100 px-2 py-0.5 rounded text-[11px] border border-neutral-200 inline-block">
+                    return (
+                      <tr key={order.order_id} className="hover:bg-neutral-50/60 transition-colors">
+                        {/* 1. Order ID & Date */}
+                        <td className="py-3.5 px-4 align-top">
+                          <span className="font-mono font-bold text-neutral-900 bg-neutral-100 px-2 py-0.5 rounded text-[11px] border border-neutral-200 inline-block">
+                            {displayId}
+                          </span>
+                          <p className="text-[11px] text-neutral-400 mt-1.5 flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-neutral-400" />
+                            {dateStr}
+                          </p>
+                        </td>
+
+                        {/* 2. Product Details */}
+                        <td className="py-3.5 px-4 align-top max-w-[280px]">
+                          <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 rounded-lg bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 flex items-center justify-center">
+                              {img ? (
+                                <img src={img} alt={order.product?.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-xl">📦</span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-neutral-900 truncate">
+                                {order.product?.name || 'Custom Product'}
+                              </h4>
+                              {order.variant && (
+                                <span className="inline-block mt-0.5 text-[10px] text-neutral-500 bg-neutral-100 px-1.5 py-0.2 rounded font-medium">
+                                  {order.variant.variant_type}: {order.variant.variant_value}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 3. Buyer */}
+                        <td className="py-3.5 px-4 align-top">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold">
+                              {(order.buyer?.full_name || 'B').charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-medium text-neutral-800">
+                              {order.buyer?.full_name || 'Verified Buyer'}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 4. Total Amount */}
+                        <td className="py-3.5 px-4 align-top">
+                          <span className="font-bold text-neutral-900 text-sm">
+                            {formatINR(order.item_price || 0)}
+                          </span>
+                        </td>
+
+                        {/* 5. Status Badge */}
+                        <td className="py-3.5 px-4 align-top">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${statusConf.bg} ${statusConf.color} ${statusConf.border}`}>
+                            <StatusIcon className="w-3 h-3" />
+                            {statusConf.label}
+                          </span>
+                        </td>
+
+                        {/* 6. Action: Update Status Dropdown */}
+                        <td className="py-3.5 px-4 align-top text-right">
+                          <div className="inline-block">
+                            <select
+                              value={currentStatus}
+                              disabled={updatingId === order.order_id}
+                              onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
+                              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-white text-neutral-800 shadow-2xs hover:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                              {STATUS_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card List View */}
+            <div className="md:hidden divide-y divide-neutral-100">
+              {filteredOrders.map(order => {
+                const displayId = getDisplayOrderId(order);
+                const dateStr = (order.clicked_at || order.created_at)
+                  ? new Date(order.clicked_at || order.created_at!).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  : 'N/A';
+
+                const img = order.product_images?.[0];
+                const currentStatus = (order.status || 'initiated').toLowerCase();
+                const statusConf = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.initiated;
+                const StatusIcon = statusConf.icon;
+
+                return (
+                  <div key={order.order_id} className="p-3.5 sm:p-4 space-y-3 hover:bg-neutral-50/50 transition-colors">
+                    {/* Top Row: Order ID & Date + Status */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-neutral-900 bg-neutral-100 px-2 py-0.5 rounded text-[11px] border border-neutral-200">
                           {displayId}
                         </span>
-                        <p className="text-[11px] text-neutral-400 mt-1.5 flex items-center gap-1">
+                        <span className="text-[11px] text-neutral-400 flex items-center gap-1">
                           <Calendar className="w-3 h-3 text-neutral-400" />
                           {dateStr}
-                        </p>
-                      </td>
+                        </span>
+                      </div>
 
-                      {/* 2. Product Details */}
-                      <td className="py-3.5 px-4 align-top max-w-[280px]">
-                        <div className="flex items-start gap-3">
-                          <div className="w-12 h-12 rounded-lg bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 flex items-center justify-center">
-                            {img ? (
-                              <img src={img} alt={order.product?.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-xl">📦</span>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-bold text-neutral-900 truncate">
-                              {order.product?.name || 'Custom Product'}
-                            </h4>
-                            {order.variant && (
-                              <span className="inline-block mt-0.5 text-[10px] text-neutral-500 bg-neutral-100 px-1.5 py-0.2 rounded font-medium">
-                                {order.variant.variant_type}: {order.variant.variant_value}
-                              </span>
-                            )}
-                          </div>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shrink-0 ${statusConf.bg} ${statusConf.color} ${statusConf.border}`}>
+                        <StatusIcon className="w-3 h-3" />
+                        {statusConf.label}
+                      </span>
+                    </div>
+
+                    {/* Middle: Product & Buyer Info */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0 flex items-center justify-center">
+                        {img ? (
+                          <img src={img} alt={order.product?.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">📦</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-neutral-900 text-xs line-clamp-2 leading-snug">
+                            {order.product?.name || 'Custom Product'}
+                          </h4>
+                          <span className="font-black text-neutral-900 text-sm shrink-0">
+                            {formatINR(order.item_price || 0)}
+                          </span>
                         </div>
-                      </td>
-
-                      {/* 3. Buyer */}
-                      <td className="py-3.5 px-4 align-top">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px] font-bold">
+                        {order.variant && (
+                          <span className="inline-block mt-1 text-[10px] text-neutral-500 bg-neutral-100 px-1.5 py-0.2 rounded font-medium">
+                            {order.variant.variant_type}: {order.variant.variant_value}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[9px] font-bold">
                             {(order.buyer?.full_name || 'B').charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-medium text-neutral-800">
+                          <span className="text-[11px] text-neutral-600 font-medium truncate">
                             {order.buyer?.full_name || 'Verified Buyer'}
                           </span>
                         </div>
-                      </td>
+                      </div>
+                    </div>
 
-                      {/* 4. Total Amount */}
-                      <td className="py-3.5 px-4 align-top">
-                        <span className="font-bold text-neutral-900 text-sm">
-                          {formatINR(order.item_price || 0)}
-                        </span>
-                      </td>
-
-                      {/* 5. Status Badge */}
-                      <td className="py-3.5 px-4 align-top">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${statusConf.bg} ${statusConf.color} ${statusConf.border}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {statusConf.label}
-                        </span>
-                      </td>
-
-                      {/* 6. Action: Update Status Dropdown */}
-                      <td className="py-3.5 px-4 align-top text-right">
-                        <div className="inline-block">
-                          <select
-                            value={currentStatus}
-                            disabled={updatingId === order.order_id}
-                            onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
-                            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-white text-neutral-800 shadow-2xs hover:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                          >
-                            {STATUS_OPTIONS.map(opt => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    {/* Bottom: Update Status */}
+                    <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
+                      <span className="text-[11px] font-medium text-neutral-500">Update Status:</span>
+                      <select
+                        value={currentStatus}
+                        disabled={updatingId === order.order_id}
+                        onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
+                        className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-white text-neutral-800 shadow-2xs hover:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer disabled:opacity-50"
+                      >
+                        {STATUS_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -114,11 +114,60 @@ export function SellerLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 pt-14 md:pt-0 min-h-screen">
-        <div className="p-4 md:p-6">
+      <main className="flex-1 md:ml-64 pt-14 md:pt-0 pb-20 md:pb-0 min-h-screen">
+        <div className="p-3.5 sm:p-4 md:p-6 max-w-7xl mx-auto">
           <Outlet />
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-neutral-200 flex items-center justify-around py-1.5 px-2 z-30 shadow-lg">
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) =>
+            `flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-semibold transition-colors ${
+              isActive ? 'text-emerald-700' : 'text-neutral-500 hover:text-neutral-800'
+            }`
+          }
+        >
+          <LayoutDashboard className="w-5 h-5" />
+          <span>Dashboard</span>
+        </NavLink>
+        <NavLink
+          to="/orders"
+          className={({ isActive }) =>
+            `flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-semibold transition-colors ${
+              isActive ? 'text-emerald-700' : 'text-neutral-500 hover:text-neutral-800'
+            }`
+          }
+        >
+          <ShoppingBag className="w-5 h-5" />
+          <span>Orders</span>
+        </NavLink>
+        <NavLink
+          to="/products"
+          className={({ isActive }) =>
+            `flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-semibold transition-colors ${
+              isActive ? 'text-emerald-700' : 'text-neutral-500 hover:text-neutral-800'
+            }`
+          }
+        >
+          <Package className="w-5 h-5" />
+          <span>Products</span>
+        </NavLink>
+        <NavLink
+          to="/profile"
+          className={({ isActive }) =>
+            `flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-semibold transition-colors ${
+              isActive ? 'text-emerald-700' : 'text-neutral-500 hover:text-neutral-800'
+            }`
+          }
+        >
+          <User className="w-5 h-5" />
+          <span>Profile</span>
+        </NavLink>
+      </nav>
     </div>
   );
 }

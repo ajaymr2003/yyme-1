@@ -5,7 +5,7 @@ import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import {
   ShoppingCart, Star, Sparkles, ShieldCheck, Truck, MessageCircle,
-  CheckCircle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  CheckCircle, ChevronRight, ChevronDown, ChevronUp,
   ArrowRight, Flame, Package, Store, Users, HelpCircle, Heart,
 } from 'lucide-react';
 import { FeatureBenefits } from '../../components/FeatureBenefits';
@@ -46,7 +46,13 @@ export function HomePage() {
     return cacheService.get<any[]>(CACHE_KEYS.FEATURED_PRODUCTS, true)?.data || [];
   });
   const [activeTab, setActiveTab] = useState<'trending' | 'new' | 'best'>('trending');
-  const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(1);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const isDownRef = React.useRef(false);
+  const startXRef = React.useRef(0);
+  const currentXRef = React.useRef(0);
   const [sellers, setSellers] = useState<any[]>(() => {
     return cacheService.get<any[]>(CACHE_KEYS.ACTIVE_SELLERS, true)?.data || [];
   });
@@ -106,10 +112,98 @@ export function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => setCurrentHeroSlide((p) => (p + 1) % banners.length), 5000);
-    return () => clearInterval(interval);
+    if (banners.length > 0) {
+      setCurrentIndex(1);
+    }
   }, [banners.length]);
+
+  const extendedBanners = React.useMemo(() => {
+    if (banners.length <= 1) return banners;
+    return [banners[banners.length - 1], ...banners, banners[0]];
+  }, [banners]);
+
+  useEffect(() => {
+    if (banners.length <= 1 || isDragging) return;
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setCurrentIndex((p) => p + 1);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [banners.length, isDragging]);
+
+  const handleTransitionEnd = () => {
+    setIsTransitioning(false);
+    if (currentIndex === 0) {
+      setCurrentIndex(banners.length);
+    } else if (currentIndex === banners.length + 1) {
+      setCurrentIndex(1);
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (banners.length <= 1) return;
+    if (e.button !== 0) return;
+
+    if (currentIndex === 0) {
+      setCurrentIndex(banners.length);
+    } else if (currentIndex === banners.length + 1) {
+      setCurrentIndex(1);
+    }
+
+    isDownRef.current = true;
+    startXRef.current = e.clientX;
+    currentXRef.current = e.clientX;
+    setIsDragging(true);
+    setIsTransitioning(false);
+    setDragOffset(0);
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDownRef.current) return;
+    currentXRef.current = e.clientX;
+    const diff = e.clientX - startXRef.current;
+    setDragOffset(diff);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDownRef.current) return;
+    isDownRef.current = false;
+    setIsDragging(false);
+
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // ignore
+    }
+
+    const diff = currentXRef.current - startXRef.current;
+    const threshold = 40;
+
+    if (diff < -threshold) {
+      setIsTransitioning(true);
+      setCurrentIndex((p) => p + 1);
+      setDragOffset(0);
+    } else if (diff > threshold) {
+      setIsTransitioning(true);
+      setCurrentIndex((p) => p - 1);
+      setDragOffset(0);
+    } else {
+      setIsTransitioning(true);
+      setDragOffset(0);
+    }
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    handlePointerUp(e);
+  };
 
   const showAddedToast = (name: string) => { setAddedToast(`Added "${name}" to cart!`); setTimeout(() => setAddedToast(null), 2500); };
 
@@ -133,38 +227,66 @@ export function HomePage() {
       <section className="w-full relative overflow-hidden bg-gradient-to-b from-brand-500 via-brand-500 to-brand-600 pt-5 pb-14 sm:pt-6 sm:pb-28">
         <div className="max-w-[1360px] mx-auto px-6 sm:px-6 lg:px-8 flex items-center justify-center">
           {/* Centered card with reduced banner size */}
-          <div className="w-full max-w-[680px] h-[150px] sm:h-[280px] md:h-[310px] relative rounded-xl sm:rounded-3xl overflow-hidden shadow-2xl">
+          <div
+            className={`w-full max-w-[680px] h-[150px] sm:h-[280px] md:h-[310px] relative rounded-xl sm:rounded-3xl overflow-hidden shadow-2xl select-none touch-pan-y ${
+              banners.length > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
+            }`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+          >
             {banners.length > 0 ? (
-              banners.map((banner, idx) => (
+              <>
                 <div
-                  key={banner.banner_id}
-                  className={`absolute inset-0 w-full h-full transition-opacity duration-700 ${
-                    idx === currentHeroSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-                  }`}
+                  className="flex h-full w-full"
+                  style={{
+                    transform: banners.length > 1
+                      ? `translateX(calc(-${currentIndex * 100}% + ${dragOffset}px))`
+                      : 'translateX(0)',
+                    transition: isTransitioning
+                      ? 'transform 500ms cubic-bezier(0.25, 1, 0.5, 1)'
+                      : 'none',
+                  }}
+                  onTransitionEnd={handleTransitionEnd}
                 >
-                  <img
-                    src={banner.image_url}
-                    alt={banner.title}
-                    className="w-full h-full object-cover cursor-pointer"
-                  />
-                  {/* Mobile arrows on image */}
-                  <button onClick={() => setCurrentHeroSlide(p => p === 0 ? banners.length - 1 : p - 1)} className="absolute md:hidden left-2 top-1/2 -translate-y-1/2 z-30 text-white/80 hover:text-white bg-black/20 rounded-full p-1 backdrop-blur-sm"><ChevronLeft className="w-6 h-6 stroke-[3]" /></button>
-                  <button onClick={() => setCurrentHeroSlide(p => (p + 1) % banners.length)} className="absolute md:hidden right-2 top-1/2 -translate-y-1/2 z-30 text-white/80 hover:text-white bg-black/20 rounded-full p-1 backdrop-blur-sm"><ChevronRight className="w-6 h-6 stroke-[3]" /></button>
+                  {extendedBanners.map((banner, idx) => (
+                    <div
+                      key={`${banner.banner_id}-${idx}`}
+                      className="w-full h-full shrink-0 relative"
+                    >
+                      <img
+                        src={banner.image_url}
+                        alt={banner.title}
+                        draggable={false}
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))
+
+                {/* Subtle Slide Indicator Dots */}
+                {banners.length > 1 && (
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 pointer-events-none">
+                    {banners.map((_, i) => {
+                      const activeDot = (currentIndex - 1 + banners.length) % banners.length;
+                      return (
+                        <div
+                          key={i}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            i === activeDot ? 'w-5 bg-white shadow-sm' : 'w-1.5 bg-white/50'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center bg-white/10 backdrop-blur-xs text-white text-center p-6">
                 <h1 className="text-2xl sm:text-4xl font-black">Welcome to YYME</h1>
                 <p className="text-sm sm:text-base text-white/90 mt-2">Support local artisans and explore handcrafted treasures from every corner of India.</p>
               </div>
-            )}
-
-            {/* Desktop arrows */}
-            {banners.length > 1 && (
-              <>
-                <button onClick={() => setCurrentHeroSlide(p => p === 0 ? banners.length - 1 : p - 1)} className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 z-20 text-white/80 hover:text-white items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all duration-200 bg-black/20 hover:bg-black/40 rounded-full p-2.5 backdrop-blur-xs"><ChevronLeft className="w-6 h-6 stroke-[2.5]" /></button>
-                <button onClick={() => setCurrentHeroSlide(p => (p + 1) % banners.length)} className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 z-20 text-white/80 hover:text-white items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all duration-200 bg-black/20 hover:bg-black/40 rounded-full p-2.5 backdrop-blur-xs"><ChevronRight className="w-6 h-6 stroke-[2.5]" /></button>
-              </>
             )}
           </div>
         </div>

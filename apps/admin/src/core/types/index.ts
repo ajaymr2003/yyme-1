@@ -15,6 +15,7 @@ export interface Seller {
   used_listing_count: number;
   rejection_reason: string | null;
   tier_expires_at: string | null;
+  is_disability_exempt?: boolean;
   created_at: string;
 }
 

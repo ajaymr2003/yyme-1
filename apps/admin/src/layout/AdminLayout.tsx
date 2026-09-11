@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { useAdminAuth } from '../core/contexts/AdminAuthContext';
+import { useAdminAuth, supabase } from '../core/contexts/AdminAuthContext';
 import {
   LayoutDashboard,
   Users,
@@ -30,39 +30,51 @@ interface NavSection {
   items: NavItem[];
 }
 
-const navSections: NavSection[] = [
-  {
-    title: 'OVERVIEW',
-    items: [
-      { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    ],
-  },
-  {
-    title: 'USERS',
-    items: [
-      { href: '/users', label: 'User Management', icon: Users },
-      { href: '/sellers', label: 'Sellers', icon: Store },
-      { href: '/seller-upgrades', label: 'Seller Upgrades', icon: CreditCard },
-      { href: '/verifications', label: 'Verifications', icon: ShieldCheck },
-    ],
-  },
-  {
-    title: 'MANAGEMENT',
-    items: [
-      { href: '/products', label: 'Products', icon: Package },
-      { href: '/qc-pending', label: 'QC Pending', icon: ClipboardCheck, badge: 2 },
-      { href: '/categories', label: 'Categories', icon: FolderTree },
-      { href: '/disputes', label: 'Disputes', icon: AlertTriangle },
-      { href: '/promotions', label: 'Promotions', icon: Image },
-      { href: '/audit-logs', label: 'Audit Logs', icon: ScrollText },
-      { href: '/settings', label: 'Settings', icon: Settings },
-      { href: '/platform-config', label: 'Platform Config', icon: Sliders },
-    ],
-  },
-];
-
 export function AdminLayout() {
   const { signOut, user } = useAdminAuth();
+  const [qcCount, setQcCount] = useState<number>(0);
+
+  useEffect(() => {
+    supabase
+      .from('products')
+      .select('product_id', { count: 'exact', head: true })
+      .eq('qc_status', 'submitted')
+      .then(
+        ({ count }) => setQcCount(count || 0),
+        () => setQcCount(0)
+      );
+  }, []);
+
+  const navSections: NavSection[] = [
+    {
+      title: 'OVERVIEW',
+      items: [
+        { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+      ],
+    },
+    {
+      title: 'USERS',
+      items: [
+        { href: '/users', label: 'User Management', icon: Users },
+        { href: '/sellers', label: 'Sellers', icon: Store },
+        { href: '/seller-upgrades', label: 'Seller Upgrades', icon: CreditCard },
+        { href: '/verifications', label: 'Verifications', icon: ShieldCheck },
+      ],
+    },
+    {
+      title: 'MANAGEMENT',
+      items: [
+        { href: '/products', label: 'Products', icon: Package },
+        { href: '/qc-pending', label: 'QC Pending', icon: ClipboardCheck, badge: qcCount > 0 ? qcCount : undefined },
+        { href: '/categories', label: 'Categories', icon: FolderTree },
+        { href: '/disputes', label: 'Disputes', icon: AlertTriangle },
+        { href: '/promotions', label: 'Promotions', icon: Image },
+        { href: '/audit-logs', label: 'Audit Logs', icon: ScrollText },
+        { href: '/settings', label: 'Settings', icon: Settings },
+        { href: '/platform-config', label: 'Platform Config', icon: Sliders },
+      ],
+    },
+  ];
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
