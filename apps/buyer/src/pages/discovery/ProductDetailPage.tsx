@@ -18,57 +18,8 @@ import {
   Layers,
   AlertCircle,
   MessageCircle,
-  Search,
-  Loader2,
-  Image as ImageIcon
+  Search
 } from 'lucide-react';
-
-async function fetchImageAsFile(url: string, baseName: string): Promise<{ file: File; blob: Blob } | null> {
-  const safeName = (baseName || 'product').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
-  try {
-    const res = await fetch(url, { mode: 'cors' });
-    if (res.ok) {
-      const blob = await res.blob();
-      const mime = blob.type || 'image/jpeg';
-      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
-      const file = new File([blob], `${safeName}.${ext}`, { type: mime });
-      return { file, blob };
-    }
-  } catch {
-    // Attempt fallback via canvas below
-  }
-
-  try {
-    return await new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth || img.width || 400;
-          canvas.height = img.naturalHeight || img.height || 400;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return resolve(null);
-          ctx.drawImage(img, 0, 0);
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const file = new File([blob], `${safeName}.jpg`, { type: 'image/jpeg' });
-              resolve({ file, blob });
-            } else {
-              resolve(null);
-            }
-          }, 'image/jpeg', 0.92);
-        } catch {
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      img.src = url;
-    });
-  } catch {
-    return null;
-  }
-}
 
 import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
 
@@ -126,10 +77,6 @@ export function ProductDetailPage() {
     return [];
   });
   const [addedToast, setAddedToast] = useState<string | null>(null);
-  const [clipboardToast, setClipboardToast] = useState<string | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
-  const cachedImageFileRef = useRef<File | null>(null);
-  const cachedImageBlobRef = useRef<Blob | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -272,29 +219,6 @@ export function ProductDetailPage() {
     ? [...variantImages, ...productImages.filter((u: string) => !variantImages.includes(u))]
     : productImages;
 
-  const currentImageUrl = allImages[activeImageIndex] || allImages[0] || selectedVariant?.image_urls?.[0] || product?.image_urls?.[0] || '';
-
-  // Pre-load active product image into memory so native sharing has zero delay
-  useEffect(() => {
-    if (!currentImageUrl) {
-      cachedImageFileRef.current = null;
-      cachedImageBlobRef.current = null;
-      return;
-    }
-
-    let isMounted = true;
-    fetchImageAsFile(currentImageUrl, product?.name || 'product').then((res) => {
-      if (isMounted && res) {
-        cachedImageFileRef.current = res.file;
-        cachedImageBlobRef.current = res.blob;
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentImageUrl, product?.name]);
-
   const handlePrevImage = () => {
     if (allImages.length <= 1) return;
     setActiveImageIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
@@ -378,104 +302,25 @@ export function ProductDetailPage() {
     setTimeout(() => setAddedToCart(false), 2000);
   };
 
-  const handleBuyNow = async () => {
-    if (!isInStock || isSharing) return;
-    setIsSharing(true);
+  const handleBuyNow = () => {
+    if (!isInStock) return;
 
-    try {
-      let cleanPhone = (product.seller?.whatsapp_number || '').replace(/\D/g, '');
-      if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.slice(1);
-      if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+    let cleanPhone = (product.seller?.whatsapp_number || '').replace(/\D/g, '');
+    if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.slice(1);
+    if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
 
-      const variantText = selectedVariant
-        ? `\n✨ *Variant:* ${selectedVariant.variant_type}: ${selectedVariant.variant_value}`
-        : '';
+    const variantText = selectedVariant
+      ? `\n✨ *Variant:* ${selectedVariant.variant_type}: ${selectedVariant.variant_value}`
+      : '';
 
-      // Clean message without image link or URL
-      const message = `Hello! 👋\nI would like to place an order on *YYMEE Marketplace*:\n\n🛍️ *Product:* ${product.name}${variantText}\n📦 *Quantity:* ${quantity}\n💰 *Unit Price:* ${formatINR(displayPrice)}\n💵 *Total Amount:* ${formatINR(displayPrice * quantity)}\n\nPlease confirm availability and delivery details. Thank you! 🙏`;
+    // Clean order details without any image link or URL
+    const message = `Hello! 👋\nI would like to place an order on *YYMEE Marketplace*:\n\n🛍️ *Product:* ${product.name}${variantText}\n📦 *Quantity:* ${quantity}\n💰 *Unit Price:* ${formatINR(displayPrice)}\n💵 *Total Amount:* ${formatINR(displayPrice * quantity)}\n\nPlease confirm availability and delivery details. Thank you! 🙏`;
 
-      const waUrl = cleanPhone
-        ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
-        : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    const waUrl = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
 
-      // 1. Get image file and blob
-      let imageFile = cachedImageFileRef.current;
-      let imageBlob = cachedImageBlobRef.current;
-
-      if (!imageFile && currentImageUrl) {
-        const loaded = await fetchImageAsFile(currentImageUrl, product.name);
-        if (loaded) {
-          imageFile = loaded.file;
-          imageBlob = loaded.blob;
-          cachedImageFileRef.current = loaded.file;
-          cachedImageBlobRef.current = loaded.blob;
-        }
-      }
-
-      // 2. Native Mobile Web Share API: Attaches the actual image with the caption to WhatsApp
-      if (imageFile && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-        const canShareFiles = typeof navigator.canShare === 'function' && navigator.canShare({ files: [imageFile] });
-        if (canShareFiles) {
-          try {
-            await navigator.share({
-              files: [imageFile],
-              text: message,
-            });
-            setIsSharing(false);
-            return;
-          } catch (err: any) {
-            if (err.name === 'AbortError') {
-              setIsSharing(false);
-              return;
-            }
-            console.warn('navigator.share failed, falling back to WhatsApp link', err);
-          }
-        }
-      }
-
-      // 3. Desktop / Fallback flow:
-      // Copy image to clipboard as PNG so the user can paste (Ctrl+V) directly into WhatsApp Web!
-      if (imageBlob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-        try {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-            img.src = URL.createObjectURL(imageBlob!);
-          });
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth || img.width || 400;
-          canvas.height = img.naturalHeight || img.height || 400;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0);
-            canvas.toBlob(async (pngBlob) => {
-              if (pngBlob) {
-                try {
-                  await navigator.clipboard.write([
-                    new ClipboardItem({ 'image/png': pngBlob })
-                  ]);
-                  setClipboardToast('Photo copied! In WhatsApp, press Ctrl+V to attach.');
-                  setTimeout(() => setClipboardToast(null), 5000);
-                } catch (clipErr) {
-                  console.warn('Clipboard write failed:', clipErr);
-                }
-              }
-            }, 'image/png');
-          }
-        } catch (clipError) {
-          console.warn('Clipboard copy error:', clipError);
-        }
-      }
-
-      // 4. Open WhatsApp
-      window.open(waUrl, '_blank');
-    } catch (e) {
-      console.error('Error during Buy Now:', e);
-    } finally {
-      setIsSharing(false);
-    }
+    window.open(waUrl, '_blank');
   };
 
   return (
@@ -484,18 +329,6 @@ export function ProductDetailPage() {
         <div className="fixed bottom-20 right-4 z-50 bg-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-xl font-medium text-xs flex items-center gap-2 animate-bounce">
           <Check className="w-4 h-4" />
           <span>{addedToast}</span>
-        </div>
-      )}
-
-      {clipboardToast && (
-        <div className="fixed bottom-20 right-4 z-50 bg-neutral-900/95 text-white px-4 py-3 rounded-xl shadow-2xl font-medium text-xs flex items-center gap-2.5 border border-neutral-700 backdrop-blur-xs max-w-sm animate-bounce">
-          <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-          <div className="flex-1">
-            <p className="font-semibold text-white">Photo copied to clipboard!</p>
-            <p className="text-[11px] text-neutral-300">
-              Press <kbd className="px-1 py-0.5 bg-neutral-800 rounded border border-neutral-600 text-[10px] font-mono">Ctrl+V</kbd> in WhatsApp to attach the photo.
-            </p>
-          </div>
         </div>
       )}
 
@@ -805,24 +638,15 @@ export function ProductDetailPage() {
               <button
                 type="button"
                 onClick={handleBuyNow}
-                disabled={!isInStock || isSharing}
+                disabled={!isInStock}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm ${
-                  isInStock && !isSharing
+                  isInStock
                     ? 'text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer shadow-md'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                {isSharing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Preparing WhatsApp...</span>
-                  </>
-                ) : (
-                  <>
-                    <MessageCircle className="w-4 h-4" />
-                    <span>{isInStock ? 'Buy Now' : 'Currently Unavailable'}</span>
-                  </>
-                )}
+                <MessageCircle className="w-4 h-4" />
+                <span>{isInStock ? 'Buy Now' : 'Currently Unavailable'}</span>
               </button>
             </div>
           </div>
@@ -1038,24 +862,15 @@ export function ProductDetailPage() {
         <button
           type="button"
           onClick={handleBuyNow}
-          disabled={!isInStock || isSharing}
+          disabled={!isInStock}
           className={`flex-1 py-3 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs sm:text-sm ${
-            isInStock && !isSharing
+            isInStock
               ? 'text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer shadow-md'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
-          {isSharing ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Opening...</span>
-            </>
-          ) : (
-            <>
-              <MessageCircle className="w-4 h-4" />
-              <span>{isInStock ? 'Buy Now' : 'Out of Stock'}</span>
-            </>
-          )}
+          <MessageCircle className="w-4 h-4" />
+          <span>{isInStock ? 'Buy Now' : 'Out of Stock'}</span>
         </button>
       </div>
 
