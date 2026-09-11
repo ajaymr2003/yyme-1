@@ -11,7 +11,6 @@ import {
   XCircle,
   AlertCircle,
   ChevronDown,
-  RefreshCw,
   Eye,
   Calendar,
   User,
@@ -222,7 +221,7 @@ export function OrdersPage() {
     .reduce((acc, o) => acc + (Number(o.item_price) || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full min-w-0">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-xl flex items-center gap-2 border border-neutral-700 animate-in fade-in slide-in-from-bottom-2 duration-150">
@@ -232,32 +231,24 @@ export function OrdersPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-3 w-full min-w-0">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900">Orders</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-neutral-900">Orders</h1>
           <p className="text-xs text-neutral-500 mt-0.5">
             Manage incoming orders and update delivery fulfillment status
           </p>
         </div>
-        <button
-          onClick={fetchOrders}
-          disabled={loading}
-          className="self-start sm:self-auto flex items-center gap-2 px-3 py-2 bg-white border border-neutral-200 text-neutral-700 text-xs font-semibold rounded-lg hover:bg-neutral-50 transition-colors shadow-2xs"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
-          <span>Refresh Orders</span>
-        </button>
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 w-full min-w-0">
         <div className="bg-white border border-neutral-200 rounded-xl p-3 sm:p-4 shadow-xs">
           <div className="flex items-center justify-between text-neutral-500 mb-1">
             <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider">Total Orders</span>
             <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400" />
           </div>
           <p className="text-xl sm:text-2xl font-black text-neutral-900">{totalCount}</p>
-          <p className="text-[10.5px] sm:text-[11px] text-neutral-400 mt-0.5">{formatINR(totalRevenue)} volume</p>
+          <p className="text-[10px] sm:text-[11px] text-neutral-400 mt-0.5">{formatINR(totalRevenue)} volume</p>
         </div>
 
         <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-3 sm:p-4 shadow-xs">
@@ -266,7 +257,7 @@ export function OrdersPage() {
             <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
           </div>
           <p className="text-xl sm:text-2xl font-black text-amber-900">{initiatedCount}</p>
-          <p className="text-[10.5px] sm:text-[11px] text-amber-700/80 mt-0.5">New buyer requests</p>
+          <p className="text-[10px] sm:text-[11px] text-amber-700/80 mt-0.5">New buyer requests</p>
         </div>
 
         <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-3 sm:p-4 shadow-xs">
@@ -275,7 +266,7 @@ export function OrdersPage() {
             <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
           </div>
           <p className="text-xl sm:text-2xl font-black text-blue-900">{inProgressCount}</p>
-          <p className="text-[10.5px] sm:text-[11px] text-blue-700/80 mt-0.5">Confirmed / packed</p>
+          <p className="text-[10px] sm:text-[11px] text-blue-700/80 mt-0.5">Confirmed / packed</p>
         </div>
 
         <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 sm:p-4 shadow-xs">
@@ -284,32 +275,32 @@ export function OrdersPage() {
             <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
           </div>
           <p className="text-xl sm:text-2xl font-black text-emerald-900">{deliveredCount}</p>
-          <p className="text-[10.5px] sm:text-[11px] text-emerald-700/80 mt-0.5">Fulfilled orders</p>
+          <p className="text-[10px] sm:text-[11px] text-emerald-700/80 mt-0.5">Fulfilled orders</p>
         </div>
       </div>
 
       {/* WhatsApp Order Disclaimer Notice */}
-      <div className="bg-amber-50/75 border border-amber-200/80 rounded-xl p-3.5 sm:p-4 flex items-start gap-3 shadow-2xs">
+      <div className="bg-amber-50/75 border border-amber-200/80 rounded-xl p-3 sm:p-4 flex items-start gap-2.5 sm:gap-3 shadow-2xs w-full max-w-full min-w-0">
         <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg shrink-0 mt-0.5">
           <AlertCircle className="w-4 h-4" />
         </div>
-        <div className="text-xs text-amber-900 leading-relaxed space-y-0.5">
+        <div className="text-xs text-amber-900 leading-relaxed space-y-0.5 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="font-bold text-amber-950">Important Order Disclaimer</h4>
             <span className="text-[10px] font-bold bg-amber-200/70 text-amber-900 px-1.5 py-0.5 rounded-md">Notice</span>
           </div>
-          <p className="text-amber-900/90 text-[11.5px] sm:text-xs">
+          <p className="text-amber-900/90 text-[11px] sm:text-xs">
             When a buyer clicks <strong>"Buy Now"</strong>, the order is registered as <strong>Initiated</strong>. Please note that clicking "Buy Now" does not mean you will automatically receive an order request message on WhatsApp (the buyer may not have sent the message or may have closed WhatsApp). Always confirm details with the buyer before dispatching.
           </p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-neutral-200 rounded-xl p-3.5 sm:p-4 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+      <div className="bg-white border border-neutral-200 rounded-xl p-3 sm:p-4 shadow-xs space-y-3 w-full max-w-full min-w-0">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between w-full max-w-full min-w-0">
           
           {/* Status Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none -mx-1 px-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 md:pb-0 scrollbar-none w-full max-w-full min-w-0 touch-pan-x">
             {[
               { id: 'all', label: 'All Orders', count: totalCount },
               { id: 'initiated', label: 'Initiated', count: initiatedCount },
@@ -322,7 +313,7 @@ export function OrdersPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setStatusFilter(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
                   statusFilter === tab.id
                     ? 'bg-emerald-700 text-white shadow-xs'
                     : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
@@ -341,7 +332,7 @@ export function OrdersPage() {
           </div>
 
           {/* Search Box */}
-          <div className="relative w-full md:w-72">
+          <div className="relative w-full md:w-72 shrink-0">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"

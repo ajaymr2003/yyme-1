@@ -9,7 +9,7 @@ export function SellerLayout() {
   const { clicksRemaining, tier } = useQuota();
 
   return (
-    <div className="min-h-screen bg-stone-100 flex">
+    <div className="min-h-screen bg-stone-100 flex flex-col md:flex-row w-full max-w-full overflow-x-hidden">
       {/* Sidebar */}
       <aside className="hidden md:flex w-64 bg-white border-r border-neutral-200 flex-col fixed h-full z-30">
         <div className="p-5 border-b border-neutral-100">
@@ -114,8 +114,8 @@ export function SellerLayout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 pt-14 md:pt-0 pb-20 md:pb-0 min-h-screen">
-        <div className="p-3.5 sm:p-4 md:p-6 max-w-7xl mx-auto">
+      <main className="flex-1 md:ml-64 pt-14 md:pt-0 pb-20 md:pb-0 min-h-screen w-full max-w-full min-w-0 overflow-x-hidden">
+        <div className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto w-full min-w-0">
           <Outlet />
         </div>
       </main>
