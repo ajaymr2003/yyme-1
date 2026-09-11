@@ -17,7 +17,7 @@ interface BuyerProfile {
   buyer_id: string;
   user_id: string;
   full_name: string;
-  default_address_id: string | null;
+  default_address_id?: string | null;
 }
 
 interface AuthCtx {
@@ -94,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data } = await supabase
         .from('buyers')
-        .select('buyer_id, user_id, full_name, default_address_id')
+        .select('buyer_id, user_id, full_name')
         .eq('user_id', userId)
         .maybeSingle();
       setBuyerProfile(data);
@@ -150,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (existingUser?.user_id) {
       const { data: b } = await supabase
         .from('buyers')
-        .select('buyer_id, user_id, full_name, default_address_id')
+        .select('buyer_id, user_id, full_name')
         .eq('user_id', existingUser.user_id)
         .maybeSingle();
       existingProfile = b;
@@ -183,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userId = generateUUIDFromPhone(cleanPhone);
 
     // 1. Upsert public.users
-    await supabase.from('users').upsert({
+    const { error: userErr } = await supabase.from('users').upsert({
       user_id: userId,
       phone_number: formattedPhone,
       email,
@@ -192,11 +192,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       last_login_at: new Date().toISOString(),
     }, { onConflict: 'user_id' });
 
+    if (userErr) {
+      console.error('Failed to create user record:', userErr);
+      throw new Error(userErr.message || 'Failed to create user account');
+    }
+
     // 2. Upsert public.buyers
-    await supabase.from('buyers').upsert({
+    const { error: buyerErr } = await supabase.from('buyers').upsert({
       user_id: userId,
       full_name: name.trim(),
     }, { onConflict: 'user_id' });
+
+    if (buyerErr) {
+      console.error('Failed to create buyer profile:', buyerErr);
+      if (buyerErr.code === '42501') {
+        throw new Error('Database permission error (RLS): Run supabase/FIX_BUYERS_TABLE.sql in your Supabase SQL Editor to allow writing to the buyers table.');
+      }
+      throw new Error(buyerErr.message || 'Failed to save buyer profile');
+    }
 
     // 3. Create mock session
     const { mockUser, mockSession } = createMockSession(cleanPhone, userId);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../core/contexts/AuthContext';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { supabase, useAuth } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import { ShoppingCart, Store, Search, X, Package } from 'lucide-react';
@@ -9,6 +9,8 @@ export function SearchPage() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const navigate = useNavigate();
+  const location = useLocation();
+  const { session } = useAuth();
   const { addItem } = useCart();
   const [searchQuery, setSearchQuery] = useState(query);
   const [products, setProducts] = useState<any[]>([]);
@@ -119,6 +121,10 @@ export function SearchPage() {
                       <button
                         onClick={async () => {
                           if (!isInStock) return;
+                          if (!session) {
+                            navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+                            return;
+                          }
                           await addItem(p);
                           showAddedToast(p.name);
                         }}

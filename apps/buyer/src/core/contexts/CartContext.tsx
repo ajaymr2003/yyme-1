@@ -221,15 +221,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .maybeSingle();
 
         if (!cart) {
-          const { data: newCart } = await supabase
+          const { data: newCart, error: cartErr } = await supabase
             .from('cart')
             .insert([{ buyer_id: buyerProfile.buyer_id }])
             .select('cart_id, seller_id')
-            .single();
+            .maybeSingle();
+
+          if (cartErr) {
+            console.warn('Cart table access error (RLS):', cartErr.message);
+          }
           cart = newCart;
         }
 
-        if (!cart) {
+        if (!cart?.cart_id) {
+          // Fallback to local cart so UI stays active and functional even before RLS script is executed
+          const guestRows = getGuestCart();
+          setCartId('guest_cart');
+          setItems(guestRows);
+          await computeSummary(guestRows);
           setLoading(false);
           return;
         }
@@ -536,8 +545,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         buyer_id: buyerProfile?.buyer_id ?? null,
         item_price: summary.displayPrice,
       }]);
+
+      // 3. Insert into orders table with product images and status 'initiated'
+      if (buyerProfile?.buyer_id && items.length > 0) {
+        const orderRecords = items.map(item => ({
+          buyer_id: buyerProfile.buyer_id,
+          seller_id: currentSeller.seller_id,
+          product_id: item.product_id,
+          variant_id: item.variant_id ?? null,
+          item_price: (item.variant?.selling_price ?? item.product?.base_price ?? 0) * item.quantity,
+          product_images: item.variant?.image_urls?.length ? item.variant.image_urls : (item.product?.image_urls ?? []),
+          status: 'initiated',
+          clicked_at: new Date().toISOString()
+        }));
+
+        await supabase.from('orders').insert(orderRecords);
+      }
     } catch (e) {
-      console.warn('Error handling WhatsApp order click quota decrement:', e);
+      console.warn('Error handling WhatsApp order click tracking:', e);
     }
   }
 

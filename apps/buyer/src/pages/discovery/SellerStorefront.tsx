@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../core/contexts/AuthContext';
 import { formatINR } from '@ymenet/utils';
 import { useCart } from '../../core/contexts/CartContext';
-import { MapPin, CheckCircle, Loader2, Store, ShoppingCart } from 'lucide-react';
+import { MapPin, CheckCircle, Loader2, Store, ShoppingCart, ShoppingBag } from 'lucide-react';
 
 interface SellerInfo {
   seller_id: string;
@@ -19,6 +19,7 @@ export const SellerStorefront: React.FC = () => {
   const navigate = useNavigate();
   const { addItem } = useCart();
   const [seller, setSeller] = useState<SellerInfo | null>(null);
+  const [ordersCount, setOrdersCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [sellerProducts, setSellerProducts] = useState<any[]>([]);
   const [toast, setToast] = useState<string | null>(null);
@@ -56,6 +57,14 @@ export const SellerStorefront: React.FC = () => {
           .eq('is_active', true)
           .eq('qc_status', 'verified');
         setSellerProducts(prods ?? []);
+
+        // Fetch seller total orders
+        const { count: ordCount } = await supabase
+          .from('orders')
+          .select('order_id', { count: 'exact', head: true })
+          .eq('seller_id', id);
+
+        setOrdersCount(ordCount ?? 0);
       } catch (err) {
         console.error('Error fetching seller:', err);
       } finally {
@@ -104,10 +113,14 @@ export const SellerStorefront: React.FC = () => {
               <span className={`border-0 font-bold text-[9px] uppercase px-2 py-0.5 rounded-md ${seller.seller_type === 'GST' ? 'bg-emerald-100 text-emerald-700' : 'bg-purple-100 text-purple-700'}`}>
                 {seller.seller_type} VERIFIED
               </span>
+              <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold px-2.5 py-0.5 rounded-full shadow-2xs">
+                <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{ordersCount} {ordersCount === 1 ? 'Order' : 'Orders'} Fulfilled</span>
+              </span>
             </div>
             <p className="text-xs text-neutral-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 font-medium">
               <span className="flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-neutral-400" /> {seller.city}, {seller.shipping_state}
+                <MapPin className="w-3.5 h-3.5 text-neutral-400" /> {seller.city || 'Kerala'}, {seller.shipping_state}
               </span>
               <span className="text-neutral-300">•</span>
               <span>Owner: {seller.owner_name}</span>

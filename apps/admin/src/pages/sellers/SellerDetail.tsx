@@ -5,7 +5,7 @@ import { formatDateTime } from '@ymenet/utils';
 import {
   ArrowLeft, Store, User, Phone, CreditCard, ShieldCheck,
   Zap, Package, Clock, MapPin, CheckCircle, XCircle,
-  Edit3, X, Check,
+  Edit3, X, Check, ShoppingBag
 } from 'lucide-react';
 import { Seller } from '../../core/types';
 import { invalidateCachePrefix } from '../../core/cache';
@@ -14,6 +14,7 @@ export function SellerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [seller, setSeller] = useState<Seller | null>(null);
+  const [ordersCount, setOrdersCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
@@ -84,6 +85,14 @@ export function SellerDetail() {
       .then(({ data }) => {
         setSeller((data as any) ?? null);
         setLoading(false);
+      });
+
+    // Fetch total orders count for this seller
+    supabase.from('orders')
+      .select('order_id', { count: 'exact', head: true })
+      .eq('seller_id', id)
+      .then(({ count }) => {
+        setOrdersCount(count ?? 0);
       });
   }, [id]);
 
@@ -184,6 +193,13 @@ export function SellerDetail() {
             <p className="text-[10px] text-neutral-400 uppercase font-medium">User ID</p>
             <p className="text-xs font-mono text-neutral-600 truncate">{seller.user_id}</p>
           </div>
+          <div>
+            <p className="text-[10px] text-neutral-400 uppercase font-medium">Total Orders</p>
+            <p className="text-sm font-bold text-emerald-700 flex items-center gap-1.5 mt-0.5">
+              <ShoppingBag className="w-4 h-4 text-emerald-600" />
+              <span>{ordersCount} {ordersCount === 1 ? 'Order' : 'Orders'}</span>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -201,7 +217,7 @@ export function SellerDetail() {
             <Edit3 className="w-3.5 h-3.5" /> Adjust Balance
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div className="bg-neutral-50 rounded-lg p-3">
             <p className="text-[10px] text-neutral-400 uppercase font-medium">Current Tier</p>
             <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${tierColors[seller.subscription_tier] || 'bg-neutral-100 text-neutral-600'}`}>
@@ -215,6 +231,11 @@ export function SellerDetail() {
                 ? new Date(seller.tier_expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
                 : '—'}
             </p>
+          </div>
+          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-lg p-3 text-center">
+            <p className="text-lg font-bold text-emerald-700">{ordersCount}</p>
+            <p className="text-[10px] text-emerald-600 font-semibold">Total Orders</p>
+            <p className="text-[10px] text-neutral-400">via marketplace</p>
           </div>
           <div 
             onClick={openQuotaModal}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { supabase } from '../../core/contexts/AuthContext';
+import { useAuth, supabase } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import {
@@ -18,7 +18,8 @@ import {
   Layers,
   AlertCircle,
   MessageCircle,
-  Search
+  Search,
+  ShoppingBag
 } from 'lucide-react';
 
 import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
@@ -28,6 +29,7 @@ export function ProductDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const passedProduct = (location.state as any)?.product;
+  const { session, buyerProfile } = useAuth();
   const { addItem, items } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -77,6 +79,20 @@ export function ProductDetailPage() {
     return [];
   });
   const [addedToast, setAddedToast] = useState<string | null>(null);
+  const [sellerOrdersCount, setSellerOrdersCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const sid = product?.seller?.seller_id || product?.seller_id;
+    if (sid) {
+      supabase
+        .from('orders')
+        .select('order_id', { count: 'exact', head: true })
+        .eq('seller_id', sid)
+        .then(({ count }) => {
+          setSellerOrdersCount(count ?? 0);
+        });
+    }
+  }, [product?.seller?.seller_id, product?.seller_id]);
 
   useEffect(() => {
     if (!id) return;
@@ -293,6 +309,12 @@ export function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!isInStock) return;
+
+    if (!session) {
+      navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+      return;
+    }
+
     await addItem(product, selectedVariant, quantity);
     setAddedToCart(true);
     const itemLabel = selectedVariant
@@ -305,6 +327,11 @@ export function ProductDetailPage() {
   const handleBuyNow = () => {
     if (!isInStock) return;
 
+    if (!session) {
+      navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+      return;
+    }
+
     let cleanPhone = (product.seller?.whatsapp_number || '').replace(/\D/g, '');
     if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.slice(1);
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
@@ -315,6 +342,22 @@ export function ProductDetailPage() {
 
     // Clean order details without any image link or URL
     const message = `Hello! 👋\nI would like to place an order on *YYMEE Marketplace*:\n\n🛍️ *Product:* ${product.name}${variantText}\n📦 *Quantity:* ${quantity}\n💰 *Unit Price:* ${formatINR(displayPrice)}\n💵 *Total Amount:* ${formatINR(displayPrice * quantity)}\n\nPlease confirm availability and delivery details. Thank you! 🙏`;
+
+    // Log initiated order into orders table
+    if (buyerProfile?.buyer_id) {
+      supabase.from('orders').insert([{
+        buyer_id: buyerProfile.buyer_id,
+        seller_id: product.seller_id,
+        product_id: product.product_id,
+        variant_id: selectedVariant?.variant_id ?? null,
+        item_price: displayPrice * quantity,
+        product_images: allImages || (product.image_urls ?? []),
+        status: 'initiated',
+        clicked_at: new Date().toISOString()
+      }]).then(({ error }) => {
+        if (error) console.warn('Order record skipped:', error.message);
+      });
+    }
 
     const waUrl = cleanPhone
       ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
@@ -360,8 +403,15 @@ export function ProductDetailPage() {
           </form>
 
           {/* Cart Button */}
-          <Link
-            to="/cart"
+          <button
+            type="button"
+            onClick={() => {
+              if (!session) {
+                navigate('/login?redirect=/cart');
+              } else {
+                navigate('/cart');
+              }
+            }}
             className="p-1.5 text-gray-800 hover:text-black hover:bg-black/5 rounded-full transition-colors relative shrink-0 flex items-center justify-center cursor-pointer"
             aria-label="Shopping Cart"
           >
@@ -371,7 +421,7 @@ export function ProductDetailPage() {
                 {totalCartCount > 99 ? '99+' : totalCartCount}
               </span>
             )}
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -738,15 +788,41 @@ export function ProductDetailPage() {
             </button>
             {soldByOpen && (
               <div className="pb-4 px-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                    <Store className="w-5 h-5 text-gray-500" />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 shrink-0">
+                      <Store className="w-5 h-5 text-emerald-700" />
+                    </div>
+                    <div>
+                      {(product.seller?.seller_id || product.seller_id) ? (
+                        <Link
+                          to={`/seller/${product.seller?.seller_id || product.seller_id}`}
+                          className="font-bold text-gray-900 text-sm hover:text-emerald-700 hover:underline block"
+                        >
+                          {product.seller?.business_name || 'Verified Artisan'}
+                        </Link>
+                      ) : (
+                        <span className="font-bold text-gray-900 text-sm block">
+                          {product.seller?.business_name || 'Verified Artisan'}
+                        </span>
+                      )}
+                      {sellerOrdersCount !== null && (
+                        <p className="text-xs text-neutral-500 flex items-center gap-1.5 mt-0.5">
+                          <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="font-bold text-emerald-700">{sellerOrdersCount}</span>
+                          <span>{sellerOrdersCount === 1 ? 'order' : 'orders'} fulfilled</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <span className="font-bold text-gray-900 text-sm">
-                      {product.seller?.business_name || 'Verified Artisan'}
-                    </span>
-                  </div>
+                  {(product.seller?.seller_id || product.seller_id) && (
+                    <Link
+                      to={`/seller/${product.seller?.seller_id || product.seller_id}`}
+                      className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+                    >
+                      Visit Store &rarr;
+                    </Link>
+                  )}
                 </div>
               </div>
             )}

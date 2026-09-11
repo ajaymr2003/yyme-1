@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useSellerAuth } from '../core/contexts/SellerAuthContext';
 import { useQuota } from '../core/contexts/QuotaContext';
-import { LayoutDashboard, Package, LogOut, Zap, BarChart3, User } from 'lucide-react';
+import { LayoutDashboard, Package, LogOut, Zap, BarChart3, User, ShoppingBag } from 'lucide-react';
 
 export function SellerLayout() {
   const { sellerProfile, signOut } = useSellerAuth();
@@ -35,6 +35,18 @@ export function SellerLayout() {
             }
           >
             <LayoutDashboard className="w-4 h-4" /> Dashboard
+          </NavLink>
+          <NavLink
+            to="/orders"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors ${
+                isActive
+                  ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-xs'
+                  : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 font-medium'
+              }`
+            }
+          >
+            <ShoppingBag className="w-4 h-4" /> Orders
           </NavLink>
           <NavLink
             to="/products"

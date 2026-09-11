@@ -42,20 +42,22 @@ export function WishlistPage() {
         return;
       }
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('favorites')
         .select('favorite_id, product_id, products(name, base_price, image_urls, sellers(business_name))')
         .eq('buyer_id', buyer.buyer_id);
 
-      const wishlistItems = (data ?? []).map((f: any) => ({
-        favorite_id: f.favorite_id,
-        product_id: f.product_id,
-        name: f.products?.name || 'Product',
-        price: f.products?.base_price || 0,
-        image_urls: f.products?.image_urls ?? [],
-        seller_name: f.products?.sellers?.business_name || 'Seller',
-      }));
-      setItems(wishlistItems);
+      if (!error && data) {
+        const wishlistItems = data.map((f: any) => ({
+          favorite_id: f.favorite_id,
+          product_id: f.product_id,
+          name: f.products?.name || 'Product',
+          price: f.products?.base_price || 0,
+          image_urls: f.products?.image_urls ?? [],
+          seller_name: f.products?.sellers?.business_name || 'Seller',
+        }));
+        setItems(wishlistItems);
+      }
     } catch (e) {
       console.warn('Error fetching wishlist:', e);
     }

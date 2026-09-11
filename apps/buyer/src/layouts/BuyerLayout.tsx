@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   ShoppingCart, ShoppingBag, Search, Heart, Bell, User, LogOut, Menu, X,
-  Home, Grid3X3, LayoutGrid, Package, Store, Moon, Sun, ChevronRight, ArrowLeft,
+  Home, Grid3X3, LayoutGrid, Package, Store, Moon, Sun, ChevronRight, ChevronDown, ArrowLeft,
   Sparkles, HelpCircle, Settings, MapPin, Wallet, FileText
 } from 'lucide-react';
 import { useAuth, supabase } from '../core/contexts/AuthContext';
@@ -26,6 +26,40 @@ export function BuyerLayout() {
     const cached = cacheService.get<any[]>(CACHE_KEYS.CATEGORIES_L1, true);
     return cached ? cached.data : [];
   });
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleAccountMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setAccountMenuOpen(true);
+  };
+
+  const handleAccountMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setAccountMenuOpen(false);
+    }, 200);
+  };
+
+  // Close account dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+          hoverTimeoutRef.current = null;
+        }
+        setAccountMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const isAuthPage = location.pathname.startsWith('/login');
   const isProfilePage = location.pathname.startsWith('/profile');
@@ -88,7 +122,7 @@ export function BuyerLayout() {
   return (
     <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-neutral-900 text-white' : 'bg-surface-warm text-neutral-900'}`}>
       {/* Header */}
-      {!isProductDetail && !isCheckoutPage && !isCartPage && !isCategoriesPage && (
+      {!isProductDetail && !isCheckoutPage && !isCategoriesPage && (
         <header className="sticky top-0 z-30 bg-white border-t-[3px] border-icon-accent border-b border-neutral-200/80">
           <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center gap-2 sm:gap-4">
             {/* Mobile Back Button (on non-home pages) */}
@@ -124,46 +158,204 @@ export function BuyerLayout() {
               />
             </Link>
 
-            {/* Search Bar */}
-            {!isProfilePage && (
-              <form onSubmit={handleSearch} className="flex-1 min-w-0">
-                <div className="relative flex items-center">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none stroke-[2]" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search products..."
-                    className="w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm bg-surface-input text-neutral-800 placeholder:text-neutral-400 border border-neutral-200/70 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all"
-                  />
-                </div>
-              </form>
-            )}
+            {/* Search Bar (Flipkart Style with Blue Border) */}
+            <form onSubmit={handleSearch} className="flex-1 min-w-0">
+              <div className="relative flex items-center">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none stroke-[2]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for Products, Brands and More"
+                  className="w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm bg-white text-neutral-900 placeholder:text-neutral-500 border border-[#166534] focus:border-[#166534] focus:ring-2 focus:ring-[#166534]/20 focus:outline-none transition-all shadow-xs"
+                />
+              </div>
+            </form>
 
-            {/* Right Action Icons: Notification Bell & Cart */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Right Action Buttons Row (Flipkart-Style) */}
+            <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+              {/* Button 1 (YYMEE) with Dropdown */}
+              <div
+                ref={accountMenuRef}
+                className="relative"
+                onMouseEnter={handleAccountMouseEnter}
+                onMouseLeave={handleAccountMouseLeave}
+              >
+                <button
+                  type="button"
+                  id="header-btn-1"
+                  onClick={() => {
+                    if (hoverTimeoutRef.current) {
+                      clearTimeout(hoverTimeoutRef.current);
+                      hoverTimeoutRef.current = null;
+                    }
+                    setAccountMenuOpen((prev) => !prev);
+                  }}
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                    accountMenuOpen
+                      ? 'text-[#2874f0] bg-blue-50/70'
+                      : 'text-neutral-800 hover:text-[#2874f0] hover:bg-blue-50/60'
+                  }`}
+                >
+                  <User className="w-4 h-4 text-neutral-700 stroke-[2]" />
+                  <span>YYMEE</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-neutral-400 stroke-[2.5] transition-transform duration-200 ${accountMenuOpen ? 'rotate-180 text-emerald-700' : ''}`} />
+                </button>
+
+                {/* Dropdown Menu (YYME Green Style) */}
+                {accountMenuOpen && (
+                  <div
+                    onMouseEnter={handleAccountMouseEnter}
+                    onMouseLeave={handleAccountMouseLeave}
+                    className="absolute right-0 sm:left-0 sm:right-auto top-full pt-1.5 w-56 z-50 animate-in fade-in slide-in-from-top-1 duration-150"
+                  >
+                    <div className="bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.14)] border border-neutral-100 py-2">
+                      {/* Header */}
+                      <div className="px-4 py-2 border-b border-neutral-100">
+                        <p className="text-xs font-bold text-neutral-900 tracking-tight">Your Account</p>
+                        {buyerProfile?.full_name && (
+                          <p className="text-[11px] text-neutral-500 truncate mt-0.5">{buyerProfile.full_name}</p>
+                        )}
+                      </div>
+
+                    <div className="py-1">
+                      {/* My Profile */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAccountMenuOpen(false);
+                          if (!session) {
+                            navigate('/login?redirect=/profile');
+                          } else {
+                            navigate('/profile');
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors cursor-pointer text-left"
+                      >
+                        <User className="w-4 h-4 text-neutral-600 stroke-[1.8]" />
+                        <span>My Profile</span>
+                      </button>
+
+                      {/* Orders */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAccountMenuOpen(false);
+                          if (!session) {
+                            navigate('/login?redirect=/orders');
+                          } else {
+                            navigate('/orders');
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors cursor-pointer text-left"
+                      >
+                        <Package className="w-4 h-4 text-neutral-600 stroke-[1.8]" />
+                        <span>Orders</span>
+                      </button>
+
+                      {/* Wishlist */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAccountMenuOpen(false);
+                          if (!session) {
+                            navigate('/login?redirect=/wishlist');
+                          } else {
+                            navigate('/wishlist');
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors cursor-pointer text-left"
+                      >
+                        <Heart className="w-4 h-4 text-neutral-600 stroke-[1.8]" />
+                        <span>Wishlist</span>
+                      </button>
+
+                      {/* Notifications */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAccountMenuOpen(false);
+                          if (!session) {
+                            navigate('/login?redirect=/notifications');
+                          } else {
+                            navigate('/notifications');
+                          }
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors cursor-pointer text-left"
+                      >
+                        <Bell className="w-4 h-4 text-neutral-600 stroke-[1.8]" />
+                        <span>Notifications</span>
+                      </button>
+
+                      {/* Become a Seller */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAccountMenuOpen(false);
+                          const sellerUrl = (import.meta.env.VITE_SELLER_URL as string) || 'http://localhost:5174';
+                          const buyerId = buyerProfile?.buyer_id || '';
+                          const userId = session?.user?.id || buyerProfile?.user_id || '';
+                          const params = new URLSearchParams();
+                          if (buyerId) params.set('buyer_id', buyerId);
+                          if (userId) params.set('user_id', userId);
+                          params.set('from', 'buyer');
+                          window.location.href = `${sellerUrl}/landing?${params.toString()}`;
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors cursor-pointer text-left"
+                      >
+                        <Store className="w-4 h-4 text-neutral-600 stroke-[1.8]" />
+                        <span>Become a Seller</span>
+                      </button>
+
+                      {/* Logout */}
+                      <div className="border-t border-neutral-100 my-1 pt-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setAccountMenuOpen(false);
+                            if (session) {
+                              await signOut();
+                              navigate('/login');
+                            } else {
+                              navigate('/login');
+                            }
+                          }}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 text-xs sm:text-sm font-medium text-neutral-700 hover:text-rose-600 hover:bg-rose-50/50 transition-colors cursor-pointer text-left"
+                        >
+                          <LogOut className="w-4 h-4 text-neutral-600 group-hover:text-rose-600 stroke-[1.8]" />
+                          <span>{session ? 'Logout' : 'Login'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+
+              {/* Cart Button */}
               <button
                 type="button"
-                className="p-2 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors relative cursor-pointer"
-                title="Notifications"
-                aria-label="Notifications"
+                id="header-btn-cart"
+                onClick={() => {
+                  if (!session) {
+                    navigate('/login?redirect=/cart');
+                  } else {
+                    navigate('/cart');
+                  }
+                }}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 text-xs sm:text-sm font-semibold text-neutral-800 hover:text-[#2874f0] hover:bg-blue-50/60 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
               >
-                <Bell className="w-5 h-5 text-neutral-700 stroke-[1.8]" />
+                <div className="relative flex items-center">
+                  <ShoppingCart className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-neutral-800 stroke-[2]" />
+                  {items.length > 0 && (
+                    <span className="absolute -top-2 -right-2.5 bg-red-600 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] px-1 flex items-center justify-center leading-none shadow-xs">
+                      {items.length}
+                    </span>
+                  )}
+                </div>
+                <span>Cart</span>
               </button>
-
-              <Link
-                to="/cart"
-                className="p-2 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors relative flex items-center justify-center cursor-pointer"
-                title="Shopping Bag"
-                aria-label="Shopping Bag"
-              >
-                <ShoppingBag className="w-5 h-5 text-neutral-800 stroke-[1.8]" />
-                {items.length > 0 && (
-                  <span className="absolute top-1 right-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                    {items.length}
-                  </span>
-                )}
-              </Link>
             </div>
           </div>
         </header>
@@ -237,11 +429,11 @@ export function BuyerLayout() {
             <LayoutGrid className="w-5 h-5" />
             <span className="text-[10px] font-medium">Categories</span>
           </Link>
-          <Link to={session ? '/profile' : '/login'} className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/profile')}`}>
+          <Link to={session ? '/profile' : '/login?redirect=/profile'} className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/profile')}`}>
             <User className="w-5 h-5" />
             <span className="text-[10px] font-medium">Account</span>
           </Link>
-          <Link to="/cart" className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/cart')}`}>
+          <Link to={session ? '/cart' : '/login?redirect=/cart'} className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/cart')}`}>
             <ShoppingCart className="w-5 h-5" />
             {items.length > 0 && (
               <span className="absolute top-0 right-2 bg-red-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-xs">

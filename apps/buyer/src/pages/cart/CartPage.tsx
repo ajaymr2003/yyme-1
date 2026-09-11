@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart, CartItemRow } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
-import { Trash2, Plus, Minus, ShoppingCart, MessageCircle, Store, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, MessageCircle, Store, ShieldCheck } from 'lucide-react';
 
 export function CartPage() {
   const { items, summary, currentSeller, loading, fetchCart, removeItem, incrementQty, decrementQty, clearCart, handleWhatsAppOrderClick } = useCart();
@@ -11,50 +11,22 @@ export function CartPage() {
   useEffect(() => { fetchCart(); }, []);
 
   if (loading) return (
-    <div className="min-h-screen bg-surface-warm flex flex-col">
-      <div className="sticky top-0 z-20 bg-white border-b border-neutral-200/80 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-1.5 -ml-1.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
-            title="Back"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
-          </button>
-          <h1 className="text-base sm:text-lg font-bold text-neutral-900">Cart</h1>
-        </div>
-      </div>
-      <div className="text-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto" /></div>
+    <div className="py-20 text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto" />
     </div>
   );
 
   if (items.length === 0) return (
-    <div className="min-h-screen bg-surface-warm flex flex-col">
-      <div className="sticky top-0 z-20 bg-white border-b border-neutral-200/80 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-1.5 -ml-1.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
-            title="Back"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
-          </button>
-          <h1 className="text-base sm:text-lg font-bold text-neutral-900">Cart</h1>
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center">
-        <ShoppingCart className="w-14 h-14 text-neutral-300 mx-auto mb-3" />
-        <h2 className="text-lg font-bold text-neutral-900">Your cart is empty</h2>
-        <p className="text-sm text-neutral-500 mt-1">Browse products and add items to your cart</p>
-        <button
-          onClick={() => navigate('/shop')}
-          className="mt-5 px-6 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
-        >
-          Browse Shop
-        </button>
-      </div>
+    <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center">
+      <ShoppingCart className="w-14 h-14 text-neutral-300 mx-auto mb-3" />
+      <h2 className="text-lg font-bold text-neutral-900">Your cart is empty</h2>
+      <p className="text-sm text-neutral-500 mt-1">Browse products and add items to your cart</p>
+      <button
+        onClick={() => navigate('/shop')}
+        className="mt-5 px-6 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
+      >
+        Browse Shop
+      </button>
     </div>
   );
 
@@ -62,31 +34,17 @@ export function CartPage() {
   const isQuotaReached = summary.seller?.remaining_click_quota !== undefined && summary.seller.remaining_click_quota <= 0;
 
   return (
-    <div className="min-h-screen bg-surface-warm flex flex-col">
-      {/* Top Header with Back Button */}
-      <div className="sticky top-0 z-20 bg-white border-b border-neutral-200/80 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-1.5 -ml-1.5 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors cursor-pointer"
-              title="Back"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
-            </button>
-            <h1 className="text-base sm:text-lg font-bold text-neutral-900">Cart ({items.length})</h1>
-          </div>
-          <button
-            onClick={clearCart}
-            className="text-xs text-red-600 font-medium hover:underline cursor-pointer"
-          >
-            Clear All
-          </button>
-        </div>
+    <div className="px-4 py-6 pb-32 max-w-2xl mx-auto w-full">
+      {/* Title & Clear All */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg sm:text-xl font-bold text-neutral-900">Cart ({items.length})</h1>
+        <button
+          onClick={clearCart}
+          className="text-xs text-red-600 font-semibold hover:underline cursor-pointer"
+        >
+          Clear All
+        </button>
       </div>
-
-      <div className="px-4 py-4 pb-32 max-w-2xl mx-auto w-full">
 
       {/* Seller Header Banner */}
       <div className="bg-white border border-neutral-200 rounded-xl p-3.5 mb-3 shadow-xs">
@@ -156,7 +114,6 @@ export function CartPage() {
             </a>
           )}
         </div>
-      </div>
       </div>
     </div>
   );

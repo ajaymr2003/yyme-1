@@ -17,6 +17,7 @@ import { AddProductPage } from './pages/product/AddProductPage';
 import { EditProductPage } from './pages/product/EditProductPage';
 import { SubscriptionPage } from './pages/subscription/SubscriptionPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
+import { OrdersPage } from './pages/orders/OrdersPage';
 
 export function AppRoutes() {
   const { session, sellerProfile, loading } = useSellerAuth();
@@ -66,6 +67,7 @@ export function AppRoutes() {
     <Routes>
       <Route element={<SellerLayout />}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/products/add" element={<AddProductPage />} />
         <Route path="/products/edit/:productId" element={<EditProductPage />} />
