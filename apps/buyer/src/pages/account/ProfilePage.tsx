@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Power,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Store
 } from 'lucide-react';
 
 interface Order {
@@ -357,7 +358,39 @@ export function ProfilePage({ defaultTab }: { defaultTab?: 'profile' | 'orders' 
             </div>
 
             {/* Section: LOGOUT */}
-            <div className="p-2">
+            {/* Section: BECOME A SELLER */}
+            <div className="p-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const sellerUrl = (import.meta.env.VITE_SELLER_URL as string) || 'http://localhost:5174';
+                  const buyerId = buyerProfile?.buyer_id || '';
+                  const userId = session?.user?.id || buyerProfile?.user_id || '';
+                  const params = new URLSearchParams();
+                  if (buyerId) params.set('buyer_id', buyerId);
+                  if (userId) params.set('user_id', userId);
+                  params.set('from', 'buyer');
+                  const targetUrl = `${sellerUrl}/landing?${params.toString()}`;
+                  console.log('[Become a Seller] ProfilePage button clicked:', {
+                    buyerId,
+                    userId,
+                    sellerUrl,
+                    targetUrl,
+                    hasSession: Boolean(session),
+                  });
+                  window.location.href = targetUrl;
+                }}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-emerald-50/70 hover:bg-emerald-100/70 rounded-xs text-emerald-800 font-bold cursor-pointer transition-colors text-xs sm:text-sm"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Store className="w-4 h-4 text-emerald-700 stroke-[2.2]" />
+                  <span>Become a Seller</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+              </button>
+            </div>
+
+            <div className="p-2 border-t border-neutral-100">
               <button
                 type="button"
                 onClick={handleLogout}

@@ -299,7 +299,15 @@ export function BuyerLayout() {
                           if (buyerId) params.set('buyer_id', buyerId);
                           if (userId) params.set('user_id', userId);
                           params.set('from', 'buyer');
-                          window.location.href = `${sellerUrl}/landing?${params.toString()}`;
+                          const targetUrl = `${sellerUrl}/landing?${params.toString()}`;
+                          console.log('[Become a Seller] Desktop button clicked:', {
+                            buyerId,
+                            userId,
+                            sellerUrl,
+                            targetUrl,
+                            hasSession: Boolean(session),
+                          });
+                          window.location.href = targetUrl;
                         }}
                         className="w-full px-4 py-2.5 flex items-center gap-3 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors cursor-pointer text-left"
                       >
@@ -496,6 +504,35 @@ export function BuyerLayout() {
               ))}
 
               <div className="my-3 border-t border-neutral-200" />
+
+              {/* Become a Seller */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  const sellerUrl = (import.meta.env.VITE_SELLER_URL as string) || 'http://localhost:5174';
+                  const buyerId = buyerProfile?.buyer_id || '';
+                  const userId = session?.user?.id || buyerProfile?.user_id || '';
+                  const params = new URLSearchParams();
+                  if (buyerId) params.set('buyer_id', buyerId);
+                  if (userId) params.set('user_id', userId);
+                  params.set('from', 'buyer');
+                  const targetUrl = `${sellerUrl}/landing?${params.toString()}`;
+                  console.log('[Become a Seller] Mobile drawer clicked:', {
+                    buyerId,
+                    userId,
+                    sellerUrl,
+                    targetUrl,
+                    hasSession: Boolean(session),
+                  });
+                  window.location.href = targetUrl;
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100/70 transition-colors mb-2"
+              >
+                <Store className="w-5 h-5 text-emerald-600" />
+                <span>Become a Seller</span>
+                <ChevronRight className="w-4 h-4 text-emerald-500 ml-auto" />
+              </button>
 
               {/* Dark Mode Toggle */}
               <button

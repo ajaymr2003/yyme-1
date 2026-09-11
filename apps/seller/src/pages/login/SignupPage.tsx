@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSellerAuth, uploadSellerDocument } from '../../core/contexts/SellerAuthContext';
-import { ArrowRight, ArrowLeft, KeyRound, Store, ShieldCheck, FileUp, Check, AlertCircle, MessageCircle, CreditCard } from 'lucide-react';
+import { ArrowRight, ArrowLeft, KeyRound, Store, ShieldCheck, FileUp, Check, AlertCircle, MessageCircle, CreditCard, Sparkles } from 'lucide-react';
 
 const IDENTITY_PROOF_OPTIONS = [
   { id: 'AADHAAR', name: 'Aadhaar Card', placeholder: 'Enter 12-digit Aadhaar number' },
@@ -13,17 +13,25 @@ const IDENTITY_PROOF_OPTIONS = [
 
 export function SignupPage() {
   const { signUp, verifyOtp, completeRegistration } = useSellerAuth();
+  const [searchParams] = useSearchParams();
+  const paramPhone = searchParams.get('phone') || '';
+  const paramName = searchParams.get('name') || '';
+  const paramUserId = searchParams.get('user_id') || '';
+  const paramBuyerId = searchParams.get('buyer_id') || '';
+
+  const cleanInitialPhone = paramPhone.replace(/\D/g, '').slice(-10);
+
   const [step, setStep] = useState<'phone' | 'otp' | 'store' | 'identity'>('phone');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(cleanInitialPhone);
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const [businessName, setBusinessName] = useState('');
-  const [ownerName, setOwnerName] = useState('');
-  const [registeredPhone, setRegisteredPhone] = useState('');
-  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [ownerName, setOwnerName] = useState(paramName);
+  const [registeredPhone, setRegisteredPhone] = useState(cleanInitialPhone);
+  const [whatsappNumber, setWhatsappNumber] = useState(cleanInitialPhone);
   const [sameAsRegistered, setSameAsRegistered] = useState(true);
 
   const [idProofType, setIdProofType] = useState('AADHAAR');
@@ -35,6 +43,7 @@ export function SignupPage() {
     if (!/^\d{10}$/.test(phone)) { setError('Enter a valid 10-digit phone number'); return; }
     setLoading(true);
     setError('');
+    console.log('[Seller Signup] 📱 Step 1: Submitting phone for registration:', phone);
     try {
       await signUp(phone);
       setStep('otp');
@@ -42,7 +51,11 @@ export function SignupPage() {
       setRegisteredPhone(phone);
       setWhatsappNumber(phone);
       setSameAsRegistered(true);
-    } catch (err: any) { setError(err.message); }
+      console.log('[Seller Signup] Moving to Step 2: OTP verification');
+    } catch (err: any) { 
+      console.error('[Seller Signup] Phone submit error:', err);
+      setError(err.message); 
+    }
     setLoading(false);
   }
 
@@ -51,13 +64,18 @@ export function SignupPage() {
     if (!/^\d{6}$/.test(otp)) { setError('Enter a valid 6-digit OTP'); return; }
     setLoading(true);
     setError('');
+    console.log('[Seller Signup] 🔑 Step 2: Verifying OTP for phone:', phone, 'otp:', otp);
     try {
       await verifyOtp(phone, otp);
       setStep('store');
       setRegisteredPhone(phone);
       setWhatsappNumber(phone);
       setSameAsRegistered(true);
-    } catch (err: any) { setError(err.message); }
+      console.log('[Seller Signup] Moving to Step 3: Store details form');
+    } catch (err: any) { 
+      console.error('[Seller Signup] OTP verify error:', err);
+      setError(err.message); 
+    }
     setLoading(false);
   }
 
@@ -66,6 +84,13 @@ export function SignupPage() {
     const finalPhone = (registeredPhone || phone).replace(/\D/g, '').slice(-10);
     const finalWhatsapp = (sameAsRegistered ? finalPhone : whatsappNumber).replace(/\D/g, '').slice(-10);
 
+    console.log('[Seller Signup] 🏪 Step 3: Validating store details:', {
+      businessName,
+      ownerName,
+      finalPhone,
+      finalWhatsapp,
+    });
+
     if (!businessName.trim()) { setError('Please enter your Business / Store Name'); return; }
     if (!ownerName.trim()) { setError('Please enter the Owner Name'); return; }
     if (finalPhone.length !== 10) { setError('Please enter a valid 10-digit Phone Number'); return; }
@@ -73,6 +98,7 @@ export function SignupPage() {
 
     setError('');
     setStep('identity');
+    console.log('[Seller Signup] Moving to Step 4: Identity verification');
   }
 
   async function handleFinalSubmit(e: React.FormEvent) {
@@ -88,24 +114,36 @@ export function SignupPage() {
     setLoading(true);
     setError('');
 
+    const registrationPayload = {
+      phone: finalPhone,
+      businessName: businessName.trim(),
+      ownerName: ownerName.trim(),
+      whatsappNumber: finalWhatsapp,
+      idProofType,
+      idProofNumber: idProofNumber.trim(),
+      userId: paramUserId || undefined,
+      buyerId: paramBuyerId || undefined,
+      is_both: true,
+    };
+
+    console.log('[Seller Signup] 🚀 Step 4: Submitting final registration payload (setting is_both: true):', registrationPayload);
+
     try {
       let docUrl = '';
       if (documentFile) {
+        console.log('[Seller Signup] Uploading document file...');
         docUrl = await uploadSellerDocument(documentFile, finalPhone);
       }
 
       await completeRegistration({
-        phone: finalPhone,
-        businessName: businessName.trim(),
-        ownerName: ownerName.trim(),
-        whatsappNumber: finalWhatsapp,
-        idProofType,
-        idProofNumber: idProofNumber.trim(),
+        ...registrationPayload,
         idDocumentUrl: docUrl || undefined,
       });
 
+      console.log('[Seller Signup] ✅ Registration succeeded! Redirecting to seller dashboard (/)');
       navigate('/');
     } catch (err: any) {
+      console.error('[Seller Signup] ❌ Final registration error:', err);
       setError(err.message || 'Registration failed. Please try again.');
     }
     setLoading(false);
@@ -196,6 +234,13 @@ export function SignupPage() {
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-black text-neutral-900 tracking-tight">{stepTitle}</h2>
                 <p className="text-sm text-neutral-500 mt-1">{stepSubtitle}</p>
+
+                {(paramBuyerId || paramUserId) && (
+                  <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Connected with your YYME buyer account</span>
+                  </div>
+                )}
 
                 {(step === 'store' || step === 'identity') && (
                   <div className="flex items-center justify-center gap-2 mt-4">

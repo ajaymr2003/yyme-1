@@ -58,6 +58,18 @@ export interface RegisterSellerInput {
   verificationType?: 'GST' | 'ENROLLMENT_ID';
   referenceNumber?: string;
   isDisabilityExempt?: boolean;
+  userId?: string;
+  buyerId?: string;
+}
+
+export interface TransitionResult {
+  action: 'dashboard' | 'signup';
+  params?: {
+    phone?: string;
+    name?: string;
+    userId?: string;
+    buyerId?: string;
+  };
 }
 
 export async function uploadSellerDocument(file: File, phoneClean: string): Promise<string> {
@@ -98,6 +110,7 @@ interface SellerAuthCtx {
   completeRegistration: (input: RegisterSellerInput) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  checkAndHandleBuyerTransition: (buyerId: string, paramUserId?: string) => Promise<TransitionResult>;
 }
 
 const SellerAuthContext = createContext<SellerAuthCtx | undefined>(undefined);
@@ -272,23 +285,198 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { isNewSeller: false };
   }
 
+  function activateSellerSession(userRecord: any, sellerRecord: SellerProfile, userId: string) {
+    const rawPhone = userRecord?.phone_number || sellerRecord?.phone_number || sellerRecord?.whatsapp_number || '9999999999';
+    const { cleanPhone, email } = getSellerShadowCredentials(rawPhone);
+    const formattedPhone = `+91${cleanPhone}`;
+
+    const mockUser: User = {
+      id: userId,
+      app_metadata: {},
+      user_metadata: { phone: formattedPhone },
+      aud: 'authenticated',
+      created_at: userRecord?.created_at || new Date().toISOString(),
+      email: userRecord?.email || email,
+      phone: formattedPhone,
+      role: 'authenticated',
+      updated_at: new Date().toISOString(),
+    };
+    const mockSession: Session = {
+      access_token: 'bypass-token',
+      refresh_token: 'bypass-refresh',
+      expires_in: 3600,
+      token_type: 'bearer',
+      user: mockUser,
+    };
+    setSession(mockSession);
+    setUser(mockUser);
+    setSellerProfile(sellerRecord);
+    localStorage.setItem('yyme_seller_bypass_session', JSON.stringify({ user: mockUser, session: mockSession }));
+  }
+
+  async function checkAndHandleBuyerTransition(buyerId: string, paramUserId?: string): Promise<TransitionResult> {
+    console.log('[SellerAuth] 🔍 Initiating checkAndHandleBuyerTransition:', { buyerId, paramUserId });
+    try {
+      // 1. Fetch buyer record from public.buyers if buyerId provided
+      let buyerRecord: { buyer_id: string; user_id: string; full_name?: string } | null = null;
+      if (buyerId) {
+        const { data: b } = await supabase
+          .from('buyers')
+          .select('buyer_id, user_id, full_name')
+          .eq('buyer_id', buyerId)
+          .maybeSingle();
+        buyerRecord = b;
+        console.log('[SellerAuth] 📦 Fetched buyer profile from DB:', buyerRecord);
+      }
+
+      const resolvedUserId = buyerRecord?.user_id || paramUserId;
+      console.log('[SellerAuth] 🔑 Resolved userId for buyer transition:', resolvedUserId);
+      if (!resolvedUserId) {
+        console.warn('[SellerAuth] ⚠️ No resolved userId found, redirecting to signup');
+        return { action: 'signup', params: { buyerId } };
+      }
+
+      // 2. Fetch user and seller info from DB
+      let userRecord: any = null;
+      try {
+        const { data: u } = await supabase
+          .from('users')
+          .select('*')
+          .eq('user_id', resolvedUserId)
+          .maybeSingle();
+        userRecord = u;
+        console.log('[SellerAuth] 👤 Fetched user record from public.users:', userRecord);
+      } catch (e) {
+        console.warn('[SellerAuth] users lookup note:', e);
+      }
+
+      let sellerRecord: SellerProfile | null = null;
+      try {
+        const { data: s } = await supabase
+          .from('sellers')
+          .select('*')
+          .eq('user_id', resolvedUserId)
+          .maybeSingle();
+        sellerRecord = s;
+        console.log('[SellerAuth] 🏪 Fetched seller record from public.sellers:', sellerRecord);
+      } catch (e) {
+        console.warn('[SellerAuth] sellers lookup note:', e);
+      }
+
+      // Check current live session in local state/storage
+      const savedBypass = localStorage.getItem('yyme_seller_bypass_session');
+      let currentActiveUserId = session?.user?.id;
+      if (!currentActiveUserId && savedBypass) {
+        try {
+          const parsed = JSON.parse(savedBypass);
+          currentActiveUserId = parsed?.user?.id;
+        } catch {}
+      }
+      console.log('[SellerAuth] 🔐 Session comparison check:', {
+        currentActiveUserId,
+        resolvedUserId,
+        isSameUser: currentActiveUserId === resolvedUserId,
+        hasSellerRecord: Boolean(sellerRecord),
+      });
+
+      // Condition 1: Check if there is already an active session for this same buyer/user
+      // If yes, user has a seller account and live session -> directly land to dashboard
+      if (currentActiveUserId === resolvedUserId && sellerRecord) {
+        console.log('[SellerAuth] ✅ CONDITION 1 MATCHED: Active seller session already exists for this buyer. Direct landing on dashboard!');
+        activateSellerSession(userRecord, sellerRecord, resolvedUserId);
+        return { action: 'dashboard' };
+      }
+
+      // Condition 2: No active session (or logged into different account):
+      // Check whether user is_both in DB. If both -> directly land to dashboard, NO OTP validation!
+      const isBoth = Boolean(userRecord?.is_both) || (Boolean(sellerRecord) && Boolean(buyerRecord));
+      console.log('[SellerAuth] ⚖️ Checking is_both in database:', {
+        is_both_column: userRecord?.is_both,
+        has_seller_and_buyer: Boolean(sellerRecord) && Boolean(buyerRecord),
+        evaluated_isBoth: isBoth,
+      });
+
+      if (isBoth && sellerRecord) {
+        console.log('[SellerAuth] ✅ CONDITION 2 MATCHED: User is marked as "both" with seller profile in DB. Auto-login WITHOUT OTP -> Direct landing on dashboard!');
+        if (!userRecord?.is_both) {
+          try {
+            await supabase.from('users').update({ is_both: true }).eq('user_id', resolvedUserId);
+            console.log('[SellerAuth] Synchronized is_both=true to public.users');
+          } catch {}
+        }
+        activateSellerSession(userRecord, sellerRecord, resolvedUserId);
+        return { action: 'dashboard' };
+      }
+
+      // Condition 3: is_both is false (or seller record does not exist yet)
+      // Must face registration: mobile number, otp, register form. is_both: true on complete
+      console.log('[SellerAuth] 📝 CONDITION 3 MATCHED: is_both is false (or no seller record exists). Routing to registration steps...');
+      const phoneClean = (userRecord?.phone_number || '').replace(/\D/g, '').slice(-10);
+      const signupParams = {
+        phone: phoneClean,
+        name: buyerRecord?.full_name || '',
+        userId: resolvedUserId,
+        buyerId: buyerId || buyerRecord?.buyer_id || '',
+      };
+      console.log('[SellerAuth] Forwarding to signup with prefilled params:', signupParams);
+      return {
+        action: 'signup',
+        params: signupParams,
+      };
+    } catch (err) {
+      console.error('[SellerAuth] ❌ checkAndHandleBuyerTransition error:', err);
+      return { action: 'signup', params: { buyerId } };
+    }
+  }
+
   async function completeRegistration(input: RegisterSellerInput) {
+    console.log('[SellerAuth] 🚀 Starting completeRegistration:', input);
     const { cleanPhone, email } = getSellerShadowCredentials(input.phone);
     const formattedPhone = `+91${cleanPhone}`;
-    const userId = generateUUIDFromPhone(cleanPhone);
 
-    // 1. Upsert public.users
-    const { error: userErr } = await supabase.from('users').upsert([{
+    let userId: string = input.userId && UUID_REGEX.test(input.userId) ? input.userId : '';
+    if (!userId) {
+      // Check if user already exists with this phone in users table
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('user_id')
+        .or(`phone_number.eq.${formattedPhone},phone_number.eq.${cleanPhone}`)
+        .maybeSingle();
+      if (existingUser?.user_id) {
+        userId = existingUser.user_id;
+        console.log('[SellerAuth] Found existing user_id for phone:', userId);
+      } else {
+        userId = generateUUIDFromPhone(cleanPhone);
+        console.log('[SellerAuth] Generated new UUID for phone:', userId);
+      }
+    } else {
+      console.log('[SellerAuth] Reusing existing linked buyer user_id:', userId);
+    }
+
+    // 1. Upsert public.users with is_both: true
+    const userPayload: any = {
       user_id: userId,
       phone_number: formattedPhone,
       email,
-      user_type: 'seller',
+      user_type: 'both',
+      is_both: true,
       is_active: true,
       last_login_at: new Date().toISOString(),
-    }], { onConflict: 'user_id' });
+    };
+
+    console.log('[SellerAuth] Upserting public.users with is_both=true:', userPayload);
+    let { error: userErr } = await supabase.from('users').upsert([userPayload], { onConflict: 'user_id' });
+
+    if (userErr && (userErr.message?.includes('is_both') || userErr.code === 'PGRST204')) {
+      console.warn('[SellerAuth] is_both column not found in public.users, retrying without it');
+      delete userPayload.is_both;
+      userPayload.user_type = 'seller';
+      const fallback = await supabase.from('users').upsert([userPayload], { onConflict: 'user_id' });
+      userErr = fallback.error;
+    }
 
     if (userErr) {
-      console.error('public.users upsert error:', userErr);
+      console.error('[SellerAuth] ❌ public.users upsert error:', userErr);
       if (userErr.code === '42501') {
         throw new Error("Database permission error (RLS): Run supabase/FIX_RLS_POLICIES.sql in your Supabase SQL Editor to allow writing to the database.");
       }
@@ -303,7 +491,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       owner_name: input.ownerName.trim(),
       whatsapp_number: input.whatsappNumber.trim() || cleanPhone,
       phone_number: formattedPhone,
-      account_status: 'pending_verification',
+      account_status: 'approved',
       is_gst_registered: false,
       subscription_tier: 'free',
       is_disability_exempt: false,
@@ -312,6 +500,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       max_listing_quota: 3,
       used_listing_count: 0,
     };
+
+    console.log('[SellerAuth] Upserting public.sellers:', sellerPayload);
 
     let { data: newSeller, error: sellerErr } = await supabase
       .from('sellers')
@@ -377,7 +567,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id_proof_type: input.idProofType || null,
       id_proof_number: input.idProofNumber?.trim() || null,
       id_document_url: input.idDocumentUrl || null,
-      account_status: 'pending_verification',
+      account_status: 'approved',
       is_gst_registered: input.isGstRegistered ?? false,
       shipping_state: input.shippingState || null,
       subscription_tier: 'free',
@@ -429,7 +619,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <SellerAuthContext.Provider value={{ session, user, sellerProfile, loading, checkSellerExists, signUp, loginWithOtp, verifyOtp, completeRegistration, signOut, refreshProfile }}>
+    <SellerAuthContext.Provider value={{ session, user, sellerProfile, loading, checkSellerExists, signUp, loginWithOtp, verifyOtp, completeRegistration, signOut, refreshProfile, checkAndHandleBuyerTransition }}>
       {children}
     </SellerAuthContext.Provider>
   );

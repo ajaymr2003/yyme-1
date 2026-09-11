@@ -10,5 +10,8 @@ export default defineConfig({
       '@ymenet/theme': path.resolve(__dirname, '../../packages/theme/index.ts'),
     },
   },
-  server: { proxy: { '/functions': 'http://127.0.0.1:54321' } },
+  server: { 
+    port: 5173,
+    proxy: { '/functions': 'http://127.0.0.1:54321' } 
+  },
 })
