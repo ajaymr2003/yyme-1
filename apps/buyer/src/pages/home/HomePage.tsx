@@ -12,6 +12,7 @@ import { FeatureBenefits } from '../../components/FeatureBenefits';
 import { WhyChooseUs } from '../../components/WhyChooseUs';
 import { MarketplaceStats } from '../../components/MarketplaceStats';
 import { SellerCTA } from '../../components/SellerCTA';
+import { WishlistButton } from '../../components/WishlistButton';
 
 const TESTIMONIALS = [
   { id: 1, rating: 5, name: 'Rahul Sharma', location: 'Bangalore', text: 'Ordered authentic handloom textiles directly from the artisan. The fabric quality and craftsmanship are remarkable!', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80' },
@@ -348,10 +349,23 @@ export function HomePage() {
 
                       {/* Out of Stock badge */}
                       {!isInStock && (
-                        <div className="absolute top-1.5 right-1.5 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs tracking-wider z-10">
+                        <div className="absolute top-1.5 left-1.5 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs tracking-wider z-10">
                           Out of Stock
                         </div>
                       )}
+
+                      {/* Wishlist Heart Button */}
+                      <WishlistButton
+                        productId={p.product_id}
+                        product={{
+                          name: p.name,
+                          base_price: p.base_price,
+                          mrp: p.mrp,
+                          image_urls: p.image_urls,
+                          seller_name: brandOrSeller,
+                        }}
+                        className="absolute top-1.5 right-1.5 z-10"
+                      />
 
                       {/* Bottom-left Rating Badge: 4.2 ★ (3,486) */}
                       <div className="absolute bottom-1.5 left-1.5 bg-white/95 backdrop-blur-xs px-1.5 py-0.5 rounded text-[10px] font-bold text-neutral-800 flex items-center gap-0.5 shadow-2xs">

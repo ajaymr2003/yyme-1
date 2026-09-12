@@ -16,6 +16,7 @@ import {
   CheckCircle,
   Package
 } from 'lucide-react';
+import { WishlistButton } from '../../components/WishlistButton';
 
 export function CategoriesPage() {
   const navigate = useNavigate();
@@ -377,6 +378,17 @@ export function CategoriesPage() {
                             </div>
                           )}
 
+                          {/* Wishlist Button */}
+                          <WishlistButton
+                            productId={p.product_id}
+                            product={{
+                              name: p.name,
+                              base_price: p.base_price,
+                              image_urls: p.image_urls,
+                            }}
+                            className="absolute top-1.5 right-1.5 z-10"
+                          />
+
                           {/* Launch Badge */}
                           <div className="absolute bottom-1.5 left-1 right-1 flex justify-center">
                             <span className="bg-emerald-700 text-white text-[8px] sm:text-[9px] font-extrabold px-2 py-0.5 rounded-md shadow-xs tracking-wider uppercase truncate max-w-full">
@@ -566,10 +578,23 @@ export function CategoriesPage() {
 
                             {/* Out of Stock badge */}
                             {(p.stock_quantity === false || (p.stock_quantity as any) === 0) && (
-                              <div className="absolute top-1 right-1 bg-rose-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs tracking-wider z-10">
+                              <div className="absolute top-1 left-1 bg-rose-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs tracking-wider z-10">
                                 Out of Stock
                               </div>
                             )}
+
+                            {/* Wishlist Button */}
+                            <WishlistButton
+                              productId={p.product_id}
+                              product={{
+                                name: p.name,
+                                base_price: p.base_price,
+                                mrp: p.mrp,
+                                image_urls: p.image_urls,
+                                seller_name: p.seller?.business_name,
+                              }}
+                              className="absolute top-1 right-1 z-10"
+                            />
 
                             {/* Rating badge */}
                             <div className="absolute bottom-1 left-1 bg-white/95 backdrop-blur-xs px-1 py-0.2 rounded text-[9px] font-bold text-neutral-800 flex items-center gap-0.5 shadow-2xs">

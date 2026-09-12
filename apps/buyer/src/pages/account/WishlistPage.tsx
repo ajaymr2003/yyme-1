@@ -1,75 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { supabase } from '../../core/contexts/AuthContext';
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { useWishlist } from '../../core/contexts/WishlistContext';
+import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
-import { Heart, Trash2, ShoppingCart, ExternalLink } from 'lucide-react';
-
-interface WishlistItem {
-  favorite_id: string;
-  product_id: string;
-  name: string;
-  price: number;
-  image_urls: string[];
-  seller_name: string;
-}
+import { Heart, Trash2, ShoppingCart, ArrowRight, ArrowLeft, Sparkles, LogIn } from 'lucide-react';
 
 export function WishlistPage() {
-  const { session, buyerProfile, loading: authLoading } = useAuth();
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { session } = useAuth();
+  const { items, removeFromWishlist, loading } = useWishlist();
+  const { addItem } = useCart();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (authLoading) return;
-    fetchWishlist();
-  }, [session, authLoading]);
+  const handleAddToCart = async (item: any) => {
+    await addItem({
+      product_id: item.product_id,
+      name: item.name,
+      base_price: item.price,
+      image_urls: item.image_urls,
+    });
+  };
 
-  async function fetchWishlist() {
-    if (!session?.user?.id) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { data: buyer } = await supabase
-        .from('buyers')
-        .select('buyer_id')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (!buyer) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('favorites')
-        .select('favorite_id, product_id, products(name, base_price, image_urls, sellers(business_name))')
-        .eq('buyer_id', buyer.buyer_id);
-
-      if (!error && data) {
-        const wishlistItems = data.map((f: any) => ({
-          favorite_id: f.favorite_id,
-          product_id: f.product_id,
-          name: f.products?.name || 'Product',
-          price: f.products?.base_price || 0,
-          image_urls: f.products?.image_urls ?? [],
-          seller_name: f.products?.sellers?.business_name || 'Seller',
-        }));
-        setItems(wishlistItems);
-      }
-    } catch (e) {
-      console.warn('Error fetching wishlist:', e);
-    }
-    setLoading(false);
-  }
-
-  async function removeItem(favoriteId: string) {
-    await supabase.from('favorites').delete().eq('favorite_id', favoriteId);
-    setItems(items.filter(i => i.favorite_id !== favoriteId));
-  }
-
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto" />
@@ -77,76 +29,156 @@ export function WishlistPage() {
     );
   }
 
-  if (!session) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div className="text-center">
-          <Heart className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
-          <h2 className="text-lg font-bold text-neutral-900 mb-1">Your Wishlist</h2>
-          <p className="text-sm text-neutral-500 mb-4">Sign in to save your favorite items</p>
-          <Link to="/login" className="inline-block px-6 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-colors">
-            Sign In
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-lg mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
+    <div className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
+      {/* Back button */}
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 mb-2 cursor-pointer py-1 px-2 -ml-2 rounded-lg hover:bg-neutral-100 transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Back</span>
+      </button>
+
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-neutral-200">
         <div>
-          <h1 className="text-lg font-bold text-neutral-900">My Wishlist</h1>
-          <p className="text-xs text-neutral-500">{items.length} saved item{items.length !== 1 ? 's' : ''}</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">My Wishlist</h1>
+            <span className="bg-rose-100 text-rose-700 text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Heart className="w-3 h-3 fill-rose-600 text-rose-600" />
+              {items.length} {items.length === 1 ? 'item' : 'items'}
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-1">
+            Handcrafted finds and artisan products you've saved
+          </p>
         </div>
+
+        {!session && items.length > 0 && (
+          <Link
+            to="/login?redirect=/wishlist"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-900 text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition-colors self-start sm:self-auto shadow-xs"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            Sign In to Sync Across Devices
+          </Link>
+        )}
       </div>
 
       {items.length === 0 ? (
-        <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
-          <Heart className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
-          <p className="text-sm font-bold text-neutral-800">Your wishlist is empty</p>
-          <p className="text-xs text-neutral-400 mt-1 mb-4">Browse products and tap the heart icon to save them here</p>
-          <Link to="/shop" className="inline-block px-5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-colors">
-            Browse Products
-          </Link>
+        <div className="bg-white border border-neutral-200/80 rounded-3xl p-8 sm:p-14 text-center max-w-md mx-auto shadow-xs">
+          <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+            <Heart className="w-8 h-8 text-rose-400 stroke-[1.8]" />
+          </div>
+          <h2 className="text-base sm:text-lg font-bold text-neutral-900 mb-1.5">
+            Your Wishlist is Empty
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-500 mb-6 leading-relaxed">
+            Explore unique handcrafted treasures from independent makers across India and tap the heart icon to save your favorites.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+            <Link
+              to="/shop"
+              className="w-full sm:w-auto px-5 py-2.5 bg-[#166534] hover:bg-[#14532d] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95"
+            >
+              Explore Products <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              to="/"
+              className="w-full sm:w-auto px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs sm:text-sm font-semibold rounded-xl transition-all"
+            >
+              Back to Home
+            </Link>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
           {items.map((item) => {
-            const discount = 0;
+            const hasDiscount = item.mrp && item.mrp > item.price;
+            const discountPercent = hasDiscount
+              ? Math.round(((item.mrp! - item.price) / item.mrp!) * 100)
+              : 0;
+
             return (
-              <div key={item.favorite_id} className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-xs flex flex-col">
-                <Link to={`/product/${item.product_id}`} className="relative aspect-square bg-neutral-100 flex items-center justify-center">
-                  {item.image_urls?.[0] ? (
-                    <img src={item.image_urls[0]} alt={item.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-3xl">📦</span>
-                  )}
-                  <button
-                    onClick={(e) => { e.preventDefault(); removeItem(item.favorite_id); }}
-                    className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-lg shadow-sm hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                  </button>
-                </Link>
-                <div className="p-3 flex-1 flex flex-col justify-between">
-                  <div>
-                    <p className="text-[10px] text-emerald-700 font-bold uppercase">{item.seller_name}</p>
-                    <Link to={`/product/${item.product_id}`}>
-                      <h4 className="text-xs font-bold text-neutral-900 line-clamp-2 mt-0.5 hover:text-emerald-700 transition-colors">
-                        {item.name}
-                      </h4>
+              <div
+                key={item.product_id}
+                className="group bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between"
+              >
+                <div>
+                  {/* Image Container with Delete Button */}
+                  <div className="relative aspect-square bg-neutral-100 overflow-hidden">
+                    <Link to={`/product/${item.product_id}`} className="block w-full h-full">
+                      {item.image_urls?.[0] ? (
+                        <img
+                          src={item.image_urls[0]}
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <span className="w-full h-full flex items-center justify-center text-3xl">
+                          📦
+                        </span>
+                      )}
                     </Link>
-                  </div>
-                  <div className="pt-2 mt-2 border-t border-neutral-100">
-                    <p className="text-sm font-black text-neutral-900">{formatINR(item.price)}</p>
-                    <Link
-                      to={`/product/${item.product_id}`}
-                      className="mt-2 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5"
+
+                    {/* Delete / Remove Heart button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        removeFromWishlist(item.product_id);
+                      }}
+                      title="Remove from wishlist"
+                      aria-label="Remove from wishlist"
+                      className="absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/95 backdrop-blur-xs text-neutral-500 hover:text-rose-600 hover:bg-white flex items-center justify-center shadow-xs transition-all active:scale-90 cursor-pointer"
                     >
-                      <ExternalLink className="w-3 h-3" /> View Product
-                    </Link>
+                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 hover:text-rose-600" />
+                    </button>
+
+                    {discountPercent > 0 && (
+                      <span className="absolute top-2 left-2 bg-emerald-700 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs">
+                        {discountPercent}% OFF
+                      </span>
+                    )}
                   </div>
+
+                  {/* Info Area */}
+                  <div className="p-3">
+                    <span className="block text-[10px] font-bold text-emerald-700 uppercase tracking-wider truncate">
+                      {item.seller_name}
+                    </span>
+
+                    <Link to={`/product/${item.product_id}`}>
+                      <h3 className="text-xs sm:text-sm font-semibold text-neutral-900 line-clamp-2 mt-0.5 hover:text-emerald-700 transition-colors leading-snug">
+                        {item.name}
+                      </h3>
+                    </Link>
+
+                    <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-xs sm:text-sm font-black text-neutral-900">
+                        {formatINR(item.price)}
+                      </span>
+                      {hasDiscount && (
+                        <span className="text-[10px] text-neutral-400 line-through">
+                          {formatINR(item.mrp!)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Action Area */}
+                <div className="p-3 pt-0">
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart(item)}
+                    className="w-full py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    <span>Add to Cart</span>
+                  </button>
                 </div>
               </div>
             );

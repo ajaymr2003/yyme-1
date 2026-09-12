@@ -4,6 +4,7 @@ import { supabase } from '../../core/contexts/AuthContext';
 import { formatINR } from '@ymenet/utils';
 import { useCart } from '../../core/contexts/CartContext';
 import { MapPin, CheckCircle, Loader2, Store, ShoppingCart, ShoppingBag } from 'lucide-react';
+import { WishlistButton } from '../../components/WishlistButton';
 
 interface SellerInfo {
   seller_id: string;
@@ -184,10 +185,20 @@ export const SellerStorefront: React.FC = () => {
                     <span className="flex items-center justify-center h-full text-3xl">📦</span>
                   )}
                   {!isInStock && (
-                    <span className="absolute top-2 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-xs tracking-wider">
+                    <span className="absolute top-2 left-2 bg-rose-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-xs tracking-wider z-10">
                       Out of Stock
                     </span>
                   )}
+                  <WishlistButton
+                    productId={p.product_id}
+                    product={{
+                      name: p.name,
+                      base_price: p.base_price,
+                      image_urls: p.image_urls,
+                      seller_name: seller?.business_name,
+                    }}
+                    className="absolute top-2 right-2 z-10"
+                  />
                 </div>
                 <div className="p-3">
                   <h3 className="text-xs font-bold text-neutral-900 line-clamp-2">{p.name}</h3>

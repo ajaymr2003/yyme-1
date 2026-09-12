@@ -43,7 +43,7 @@ export function AppRoutes() {
         <Route path="/checkout" element={session ? <CheckoutPage /> : <Navigate to="/login?redirect=/checkout" />} />
         <Route path="/profile" element={session ? <ProfilePage defaultTab="profile" /> : <Navigate to="/login?redirect=/profile" />} />
         <Route path="/orders" element={session ? <ProfilePage defaultTab="orders" /> : <Navigate to="/login?redirect=/orders" />} />
-        <Route path="/wishlist" element={session ? <ProfilePage defaultTab="wishlist" /> : <Navigate to="/login?redirect=/wishlist" />} />
+        <Route path="/wishlist" element={<WishlistPage />} />
         <Route path="/notifications" element={session ? <ProfilePage defaultTab="notifications" /> : <Navigate to="/login?redirect=/notifications" />} />
         <Route path="/about" element={<AboutPage />} />
       </Route>

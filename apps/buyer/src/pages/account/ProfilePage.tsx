@@ -12,8 +12,10 @@ import {
   Power,
   CheckCircle2,
   ExternalLink,
-  Store
+  Store,
+  Trash2
 } from 'lucide-react';
+import { useWishlist } from '../../core/contexts/WishlistContext';
 
 interface Order {
   order_id: string;
@@ -75,7 +77,7 @@ export function ProfilePage({ defaultTab }: { defaultTab?: 'profile' | 'orders' 
 
   // Data lists
   const [orders, setOrders] = useState<Order[]>([]);
-  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const { items: wishlist, removeFromWishlist } = useWishlist();
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -150,27 +152,6 @@ export function ProfilePage({ defaultTab }: { defaultTab?: 'profile' | 'orders' 
               seller_name: o.seller?.business_name || 'Verified Seller'
             }));
             setOrders(mappedOrders);
-          }
-        } catch {}
-
-        // Fetch wishlist
-        try {
-          const { data: fav, error: favErr } = await supabase
-            .from('favorites')
-            .select('favorite_id, product_id, products(name, base_price, image_urls, sellers(business_name))')
-            .eq('buyer_id', buyer.buyer_id)
-            .limit(10);
-
-          if (!favErr && fav) {
-            const wishlistItems = fav.map((f: any) => ({
-              favorite_id: f.favorite_id,
-              product_id: f.product_id,
-              name: f.products?.name || 'Product',
-              price: f.products?.base_price || 0,
-              image_urls: f.products?.image_urls ?? [],
-              seller_name: f.products?.sellers?.business_name || 'Seller',
-            }));
-            setWishlist(wishlistItems);
           }
         } catch {}
       }
@@ -745,6 +726,12 @@ export function ProfilePage({ defaultTab }: { defaultTab?: 'profile' | 'orders' 
                 <h3 className="text-base sm:text-lg font-bold text-neutral-900">
                   My Wishlist ({wishlist.length})
                 </h3>
+                <Link
+                  to="/wishlist"
+                  className="text-xs sm:text-sm font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline transition-colors"
+                >
+                  View All <ChevronRight className="w-4 h-4" />
+                </Link>
               </div>
 
               {wishlist.length === 0 ? (
@@ -762,12 +749,12 @@ export function ProfilePage({ defaultTab }: { defaultTab?: 'profile' | 'orders' 
               ) : (
                 <div className="divide-y divide-neutral-100">
                   {wishlist.map((item) => (
-                    <div key={item.favorite_id} className="py-4 flex items-center justify-between gap-4">
+                    <div key={item.product_id} className="py-4 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <img
                           src={item.image_urls?.[0] || ''}
                           alt={item.name}
-                          className="w-16 h-16 object-cover rounded-xs border border-neutral-200"
+                          className="w-16 h-16 object-cover rounded-xl border border-neutral-200"
                         />
                         <div>
                           <h4 className="text-sm font-bold text-neutral-900 line-clamp-1">{item.name}</h4>
@@ -777,12 +764,22 @@ export function ProfilePage({ defaultTab }: { defaultTab?: 'profile' | 'orders' 
                           </span>
                         </div>
                       </div>
-                      <Link
-                        to={`/product/${item.product_id}`}
-                        className="text-xs font-bold text-emerald-700 border border-emerald-600 px-3.5 py-1.5 rounded-xs hover:bg-emerald-50"
-                      >
-                        View Item
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/product/${item.product_id}`}
+                          className="text-xs font-bold text-emerald-700 border border-emerald-600 px-3.5 py-1.5 rounded-xl hover:bg-emerald-50 transition-colors"
+                        >
+                          View Item
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => removeFromWishlist(item.product_id)}
+                          className="p-1.5 rounded-xl hover:bg-red-50 text-neutral-400 hover:text-red-500 transition-colors"
+                          title="Remove from wishlist"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

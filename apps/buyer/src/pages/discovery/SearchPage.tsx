@@ -4,6 +4,7 @@ import { supabase, useAuth } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import { ShoppingCart, Store, Search, X, Package } from 'lucide-react';
+import { WishlistButton } from '../../components/WishlistButton';
 
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -203,6 +204,19 @@ export function SearchPage() {
                         {discount}% OFF
                       </span>
                     ) : null}
+
+                    {/* Wishlist Button */}
+                    <WishlistButton
+                      productId={p.product_id}
+                      product={{
+                        name: p.name,
+                        base_price: p.base_price,
+                        mrp: p.mrp,
+                        image_urls: p.image_urls,
+                        seller_name: p.seller?.business_name,
+                      }}
+                      className="absolute top-2 right-2 z-10"
+                    />
                   </div>
                   <div className="p-3 flex-1 flex flex-col justify-between">
                     <div>

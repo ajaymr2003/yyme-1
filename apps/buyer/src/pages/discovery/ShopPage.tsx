@@ -4,6 +4,7 @@ import { supabase } from '../../core/contexts/AuthContext';
 import { useCart } from '../../core/contexts/CartContext';
 import { formatINR } from '@ymenet/utils';
 import { ShoppingCart, Store, CheckCircle } from 'lucide-react';
+import { WishlistButton } from '../../components/WishlistButton';
 
 import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
 
@@ -179,10 +180,23 @@ export function ShopPage() {
 
                     {/* Out of Stock badge */}
                     {!isInStock && (
-                      <div className="absolute top-1.5 right-1.5 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs tracking-wider z-10">
+                      <div className="absolute top-1.5 left-1.5 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs tracking-wider z-10">
                         Out of Stock
                       </div>
                     )}
+
+                    {/* Wishlist Button */}
+                    <WishlistButton
+                      productId={p.product_id}
+                      product={{
+                        name: p.name,
+                        base_price: p.base_price,
+                        mrp: p.mrp,
+                        image_urls: p.image_urls,
+                        seller_name: brandOrSeller,
+                      }}
+                      className="absolute top-1.5 right-1.5 z-10"
+                    />
 
                     {/* Bottom-left Rating Badge: 4.2 ★ (3,486) */}
                     <div className="absolute bottom-1.5 left-1.5 bg-white/95 backdrop-blur-xs px-1.5 py-0.5 rounded text-[10px] font-bold text-neutral-800 flex items-center gap-0.5 shadow-2xs">

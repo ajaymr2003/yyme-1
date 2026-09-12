@@ -21,6 +21,7 @@ import {
   Search,
   ShoppingBag
 } from 'lucide-react';
+import { WishlistButton } from '../../components/WishlistButton';
 
 import { cacheService, CACHE_KEYS, CACHE_TTL } from '../../core/services/cacheService';
 
@@ -522,15 +523,28 @@ export function ProductDetailPage() {
             </div>
           )}
 
-          {/* Out of Stock Overlay Badge */}
-          {!isInStock && (
-            <div className="absolute top-4 right-4 z-20">
+          {/* Top-right Gallery Controls: Stock badge & Wishlist button */}
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+            {!isInStock && (
               <span className="bg-rose-600 text-white text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-md flex items-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5" />
                 Out of Stock
               </span>
-            </div>
-          )}
+            )}
+            <WishlistButton
+              productId={product.product_id}
+              product={{
+                name: product.name,
+                base_price: product.base_price,
+                mrp: product.mrp,
+                image_urls: product.image_urls,
+                seller_name: product.seller?.business_name,
+              }}
+              variant="floating"
+              className="w-10 h-10 shadow-md bg-white/95"
+              iconClassName="w-5 h-5"
+            />
+          </div>
         </div>
 
         <div className="px-4 space-y-0">
@@ -540,6 +554,19 @@ export function ProductDetailPage() {
               <h1 className="text-base sm:text-lg font-semibold text-gray-900 leading-snug">
                 {product.name}
               </h1>
+              <WishlistButton
+                productId={product.product_id}
+                product={{
+                  name: product.name,
+                  base_price: product.base_price,
+                  mrp: product.mrp,
+                  image_urls: product.image_urls,
+                  seller_name: product.seller?.business_name,
+                }}
+                variant="detail"
+                showLabel={true}
+                className="shrink-0 hidden sm:flex"
+              />
             </div>
 
             <div className="flex items-center gap-2 mt-2">
@@ -884,6 +911,19 @@ export function ProductDetailPage() {
                             {discount}% OFF
                           </span>
                         ) : null}
+
+                        {/* Wishlist button */}
+                        <WishlistButton
+                          productId={rp.product_id}
+                          product={{
+                            name: rp.name,
+                            base_price: rp.base_price,
+                            mrp: rp.mrp,
+                            image_urls: rp.image_urls,
+                            seller_name: rp.seller?.business_name,
+                          }}
+                          className="absolute top-1.5 right-1.5 z-10"
+                        />
 
                         {/* Rating pill */}
                         <div className="absolute bottom-1.5 left-1.5 bg-white/95 backdrop-blur-xs px-1.5 py-0.5 rounded text-[9px] font-bold text-gray-800 flex items-center gap-0.5 shadow-2xs">

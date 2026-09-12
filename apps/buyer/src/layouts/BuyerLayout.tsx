@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth, supabase } from '../core/contexts/AuthContext';
 import { useCart } from '../core/contexts/CartContext';
+import { useWishlist } from '../core/contexts/WishlistContext';
 import { getCategoryIcon, BagIcon } from '../components/CategoryIcons';
 
 import { cacheService, CACHE_KEYS, CACHE_TTL } from '../core/services/cacheService';
@@ -14,6 +15,7 @@ import { cacheService, CACHE_KEYS, CACHE_TTL } from '../core/services/cacheServi
 export function BuyerLayout() {
   const { session, buyerProfile, signOut } = useAuth();
   const { items } = useCart();
+  const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -124,7 +126,7 @@ export function BuyerLayout() {
       {/* Header */}
       {!isProductDetail && !isCheckoutPage && !isCategoriesPage && (
         <header className="sticky top-0 z-30 bg-white border-t-[3px] border-icon-accent border-b border-neutral-200/80">
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center gap-2 sm:gap-4">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-2.5 pb-1 sm:py-2.5 flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
             {/* Mobile Back Button (on non-home pages) */}
             {!isHome && (
               <button
@@ -152,8 +154,8 @@ export function BuyerLayout() {
               />
             </Link>
 
-            {/* Search Bar (Flipkart Style with Blue Border) */}
-            <form onSubmit={handleSearch} className="flex-1 min-w-0">
+            {/* Desktop Search Bar (Hidden on Mobile) */}
+            <form onSubmit={handleSearch} className="hidden sm:block flex-1 min-w-0">
               <div className="relative flex items-center">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none stroke-[2]" />
                 <input
@@ -166,8 +168,8 @@ export function BuyerLayout() {
               </div>
             </form>
 
-            {/* Right Action Buttons Row (Flipkart-Style) */}
-            <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+            {/* Right Action Buttons Row (Desktop Only) */}
+            <div className="hidden sm:flex items-center gap-1 sm:gap-2.5 shrink-0 ml-auto sm:ml-0">
               {/* Button 1 (YYMEE) with Dropdown */}
               <div
                 ref={accountMenuRef}
@@ -335,6 +337,30 @@ export function BuyerLayout() {
             </div>
 
 
+              {/* Wishlist Button */}
+              <button
+                type="button"
+                id="header-btn-wishlist"
+                onClick={() => {
+                  if (!session) {
+                    navigate('/login?redirect=/wishlist');
+                  } else {
+                    navigate('/wishlist');
+                  }
+                }}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 text-xs sm:text-sm font-semibold text-neutral-800 hover:text-rose-600 hover:bg-rose-50/60 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <div className="relative flex items-center">
+                  <Heart className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-neutral-800 stroke-[2] group-hover:text-rose-600" />
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-2 -right-2.5 bg-rose-600 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] px-1 flex items-center justify-center leading-none shadow-xs">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </div>
+                <span>Wishlist</span>
+              </button>
+
               {/* Cart Button */}
               <button
                 type="button"
@@ -359,6 +385,22 @@ export function BuyerLayout() {
                 <span>Cart</span>
               </button>
             </div>
+          </div>
+
+          {/* Mobile Search Bar (Full Width on Next Line) */}
+          <div className="px-3 pb-2.5 sm:hidden max-w-7xl mx-auto">
+            <form onSubmit={handleSearch} className="w-full">
+              <div className="relative flex items-center">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none stroke-[2]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for Products, Brands and More"
+                  className="w-full pl-10 pr-4 py-2 rounded-lg text-xs bg-white text-neutral-900 placeholder:text-neutral-500 border border-[#166534] focus:border-[#166534] focus:ring-2 focus:ring-[#166534]/20 focus:outline-none transition-all shadow-xs"
+                />
+              </div>
+            </form>
           </div>
         </header>
       )}
@@ -431,17 +473,23 @@ export function BuyerLayout() {
             <LayoutGrid className="w-5 h-5" />
             <span className="text-[10px] font-medium">Categories</span>
           </Link>
+          <Link to="/wishlist" className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/wishlist')}`}>
+            <Heart className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Wishlist</span>
+          </Link>
           <Link to={session ? '/profile' : '/login?redirect=/profile'} className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/profile')}`}>
             <User className="w-5 h-5" />
             <span className="text-[10px] font-medium">Account</span>
           </Link>
-          <Link to={session ? '/cart' : '/login?redirect=/cart'} className={`relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/cart')}`}>
-            <ShoppingCart className="w-5 h-5" />
-            {items.length > 0 && (
-              <span className="absolute top-0 right-2 bg-red-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-xs">
-                {items.length}
-              </span>
-            )}
+          <Link to={session ? '/cart' : '/login?redirect=/cart'} className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg ${activeNav('/cart')}`}>
+            <div className="relative flex items-center justify-center">
+              <ShoppingCart className="w-5 h-5" />
+              {items.length > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center shadow-xs">
+                  {items.length}
+                </span>
+              )}
+            </div>
             <span className="text-[10px] font-medium">Cart</span>
           </Link>
         </nav>
