@@ -43,6 +43,8 @@ export interface SellerProfile {
   used_listing_count: number;
   tier_expires_at: string | null;
   rejection_reason: string | null;
+  logo_url?: string | null;
+  banner_url?: string | null;
 }
 
 export interface RegisterSellerInput {

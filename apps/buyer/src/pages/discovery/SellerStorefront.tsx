@@ -12,6 +12,8 @@ interface SellerInfo {
   seller_type: string;
   shipping_state: string;
   city: string;
+  logo_url?: string | null;
+  banner_url?: string | null;
 }
 
 export const SellerStorefront: React.FC = () => {
@@ -35,7 +37,7 @@ export const SellerStorefront: React.FC = () => {
       try {
         const { data } = await supabase
           .from('sellers')
-          .select('seller_id, business_name, owner_name')
+          .select('*')
           .eq('seller_id', id)
           .maybeSingle();
 
@@ -45,8 +47,10 @@ export const SellerStorefront: React.FC = () => {
             business_name: data.business_name,
             owner_name: data.owner_name,
             seller_type: 'Artisan',
-            shipping_state: 'India',
+            shipping_state: data.shipping_state || 'India',
             city: '',
+            logo_url: data.logo_url || null,
+            banner_url: data.banner_url || null,
           });
         }
 
@@ -100,9 +104,35 @@ export const SellerStorefront: React.FC = () => {
       )}
 
       <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-xs">
-        <div className="h-32 sm:h-44 w-full relative bg-neutral-100">
-          <div className="absolute -bottom-6 left-6 w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-4 border-white bg-white shadow-md flex items-center justify-center">
-            <span className="text-xl font-bold text-neutral-400">{seller.business_name.charAt(0)}</span>
+        {/* Cover Banner */}
+        <div className="h-36 sm:h-48 w-full relative bg-neutral-100 overflow-hidden">
+          {seller.banner_url ? (
+            <img
+              src={seller.banner_url}
+              alt={`${seller.business_name} Banner`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-linear-to-r from-emerald-800 to-teal-900 opacity-90 flex items-center justify-center">
+              <span className="text-white/20 text-3xl sm:text-5xl font-black tracking-widest uppercase select-none">
+                {seller.business_name}
+              </span>
+            </div>
+          )}
+
+          {/* Store Logo / Avatar */}
+          <div className="absolute -bottom-6 left-6 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-4 border-white bg-white shadow-md flex items-center justify-center">
+            {seller.logo_url ? (
+              <img
+                src={seller.logo_url}
+                alt={seller.business_name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-emerald-50 text-emerald-800 font-extrabold text-xl sm:text-2xl flex items-center justify-center">
+                {seller.business_name.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
         </div>
 
