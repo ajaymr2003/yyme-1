@@ -114,7 +114,7 @@ export function ProductDetailPage() {
         async () => {
           const { data: prodData } = await supabase
             .from('products')
-            .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+            .select('*, seller:sellers(*), category:categories(name)')
             .eq('product_id', id)
             .single();
 
@@ -134,7 +134,7 @@ export function ProductDetailPage() {
           if (prodData.category_id) {
             const { data: rel } = await supabase
               .from('products')
-              .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+              .select('*, seller:sellers(*), category:categories(name)')
               .eq('category_id', prodData.category_id)
               .eq('is_active', true)
               .neq('product_id', id)
@@ -146,7 +146,7 @@ export function ProductDetailPage() {
           if (relList.length < 4) {
             const { data: fallbackRel } = await supabase
               .from('products')
-              .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
+              .select('*, seller:sellers(*), category:categories(name)')
               .eq('is_active', true)
               .neq('product_id', id)
               .limit(12);
@@ -428,7 +428,7 @@ export function ProductDetailPage() {
       <div className="max-w-[900px] mx-auto">
         {/* Gallery Section with Smooth Horizontal Sliding Carousel */}
         <div
-          className="relative bg-white select-none overflow-hidden"
+          className="relative bg-white select-none overflow-hidden pt-3 sm:pt-4"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onMouseDown={handleMouseDown}
@@ -446,7 +446,7 @@ export function ProductDetailPage() {
                 {allImages.map((imgUrl: string, i: number) => (
                   <div
                     key={i}
-                    className="w-full h-full shrink-0 flex items-center justify-center cursor-zoom-in"
+                    className="w-full h-full shrink-0 flex items-center justify-center cursor-zoom-in p-2 pt-2 sm:p-4"
                     onClick={() => {
                       if (!didSwipe.current) setIsFullScreen(true);
                     }}
@@ -790,8 +790,16 @@ export function ProductDetailPage() {
               <div className="pb-4 px-1">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 shrink-0">
-                      <Store className="w-5 h-5 text-emerald-700" />
+                    <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 shrink-0 overflow-hidden">
+                      {product.seller?.logo_url ? (
+                        <img
+                          src={product.seller.logo_url}
+                          alt={product.seller.business_name || 'Seller'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Store className="w-5 h-5 text-emerald-700" />
+                      )}
                     </div>
                     <div>
                       {(product.seller?.seller_id || product.seller_id) ? (

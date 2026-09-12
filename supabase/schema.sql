@@ -50,6 +50,8 @@ CREATE TABLE public.sellers (
   max_listing_quota integer NOT NULL DEFAULT 3,
   used_listing_count integer NOT NULL DEFAULT 0,
   tier_expires_at timestamptz,
+  logo_url text,
+  banner_url text,
   rejection_reason text,
   created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
