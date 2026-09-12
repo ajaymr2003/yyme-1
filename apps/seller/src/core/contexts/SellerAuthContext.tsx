@@ -437,48 +437,91 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const formattedPhone = `+91${cleanPhone}`;
 
     let userId: string = input.userId && UUID_REGEX.test(input.userId) ? input.userId : '';
+
+    // Check if user already exists in DB (could be an existing buyer)
+    let existingUserRecord: { user_id: string; user_type: string } | null = null;
     if (!userId) {
-      // Check if user already exists with this phone in users table
       const { data: existingUser } = await supabase
         .from('users')
-        .select('user_id')
+        .select('user_id, user_type')
         .or(`phone_number.eq.${formattedPhone},phone_number.eq.${cleanPhone}`)
         .maybeSingle();
       if (existingUser?.user_id) {
         userId = existingUser.user_id;
-        console.log('[SellerAuth] Found existing user_id for phone:', userId);
+        existingUserRecord = existingUser;
+        console.log('[SellerAuth] Found existing user_id for phone:', userId, '| user_type:', existingUser.user_type);
       } else {
         userId = generateUUIDFromPhone(cleanPhone);
-        console.log('[SellerAuth] Generated new UUID for phone:', userId);
+        console.log('[SellerAuth] Generated new UUID for phone (new user):', userId);
       }
     } else {
-      console.log('[SellerAuth] Reusing existing linked buyer user_id:', userId);
+      // userId was passed in (buyer transition) - fetch their current record
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('user_id, user_type')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (existingUser) {
+        existingUserRecord = existingUser;
+        console.log('[SellerAuth] Reusing existing linked buyer user_id:', userId, '| user_type:', existingUser.user_type);
+      } else {
+        console.log('[SellerAuth] userId passed but no record found in DB, will insert as new seller:', userId);
+      }
     }
 
-    // 1. Upsert public.users with is_both: true
-    const userPayload: any = {
-      user_id: userId,
-      phone_number: formattedPhone,
-      email,
-      user_type: 'both',
-      is_both: true,
-      is_active: true,
-      last_login_at: new Date().toISOString(),
-    };
+    // 1. Handle public.users:
+    //    - If user ALREADY EXISTS: preserve their user_type (e.g. 'buyer'), just set is_both=true
+    //    - If user is NEW: INSERT with user_type='seller'
+    let userErr: any = null;
 
-    console.log('[SellerAuth] Upserting public.users with is_both=true:', userPayload);
-    let { error: userErr } = await supabase.from('users').upsert([userPayload], { onConflict: 'user_id' });
+    if (existingUserRecord) {
+      // EXISTING USER: update only non-sensitive fields, preserve user_type
+      console.log('[SellerAuth] Existing user detected — preserving user_type:', existingUserRecord.user_type, '| Setting is_both=true');
+      const updatePayload: any = {
+        is_both: true,
+        is_active: true,
+        last_login_at: new Date().toISOString(),
+      };
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update(updatePayload)
+        .eq('user_id', userId);
 
-    if (userErr && (userErr.message?.includes('is_both') || userErr.code === 'PGRST204')) {
-      console.warn('[SellerAuth] is_both column not found in public.users, retrying without it');
-      delete userPayload.is_both;
-      userPayload.user_type = 'seller';
-      const fallback = await supabase.from('users').upsert([userPayload], { onConflict: 'user_id' });
-      userErr = fallback.error;
+      if (updateErr && (updateErr.message?.includes('is_both') || updateErr.code === 'PGRST204')) {
+        console.warn('[SellerAuth] is_both column not found, retrying without it');
+        const { error: fallbackErr } = await supabase
+          .from('users')
+          .update({ is_active: true, last_login_at: new Date().toISOString() })
+          .eq('user_id', userId);
+        userErr = fallbackErr;
+      } else {
+        userErr = updateErr;
+      }
+    } else {
+      // NEW USER: INSERT with user_type='seller'
+      console.log('[SellerAuth] New user — inserting into public.users with user_type=seller');
+      const insertPayload: any = {
+        user_id: userId,
+        phone_number: formattedPhone,
+        email,
+        user_type: 'seller',
+        is_both: false,
+        is_active: true,
+        last_login_at: new Date().toISOString(),
+      };
+      const { error: insertErr } = await supabase.from('users').insert([insertPayload]);
+      if (insertErr && (insertErr.message?.includes('is_both') || insertErr.code === 'PGRST204')) {
+        console.warn('[SellerAuth] is_both column not found, retrying without it');
+        delete insertPayload.is_both;
+        const { error: fallbackErr } = await supabase.from('users').insert([insertPayload]);
+        userErr = fallbackErr;
+      } else {
+        userErr = insertErr;
+      }
     }
 
     if (userErr) {
-      console.error('[SellerAuth] ❌ public.users upsert error:', userErr);
+      console.error('[SellerAuth] ❌ public.users write error:', userErr);
       if (userErr.code === '42501') {
         throw new Error("Database permission error (RLS): Run supabase/FIX_RLS_POLICIES.sql in your Supabase SQL Editor to allow writing to the database.");
       }
@@ -493,7 +536,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       owner_name: input.ownerName.trim(),
       whatsapp_number: input.whatsappNumber.trim() || cleanPhone,
       phone_number: formattedPhone,
-      account_status: 'approved',
+      account_status: 'active',
       is_gst_registered: false,
       subscription_tier: 'free',
       is_disability_exempt: false,
@@ -569,7 +612,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id_proof_type: input.idProofType || null,
       id_proof_number: input.idProofNumber?.trim() || null,
       id_document_url: input.idDocumentUrl || null,
-      account_status: 'approved',
+      account_status: 'active',
       is_gst_registered: input.isGstRegistered ?? false,
       shipping_state: input.shippingState || null,
       subscription_tier: 'free',

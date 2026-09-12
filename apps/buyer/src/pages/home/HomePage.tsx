@@ -6,7 +6,7 @@ import { formatINR } from '@ymenet/utils';
 import {
   ShoppingCart, Star, Sparkles, ShieldCheck, Truck, MessageCircle,
   CheckCircle, ChevronRight, ChevronDown, ChevronUp,
-  ArrowRight, Flame, Package, Store, Users, HelpCircle, Heart,
+  ArrowRight, Flame, Package, Store, Users, HelpCircle, Heart, MapPin,
 } from 'lucide-react';
 import { FeatureBenefits } from '../../components/FeatureBenefits';
 import { WhyChooseUs } from '../../components/WhyChooseUs';
@@ -65,20 +65,29 @@ export function HomePage() {
     cacheService.fetchWithCache(
       CACHE_KEYS.BANNERS,
       async () => {
-        const { data } = await supabase.from('banners').select('*').eq('is_active', true).order('display_order');
+        const { data } = await supabase
+          .from('banners')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
         return data ?? [];
       },
-      { ttl: CACHE_TTL.MEDIUM, onBackgroundUpdate: (fresh) => setBanners(fresh) }
+      { ttl: CACHE_TTL.SHORT, onBackgroundUpdate: (fresh) => setBanners(fresh) }
     ).then((data) => setBanners(data));
 
     // 2. Categories with cache
     cacheService.fetchWithCache(
       CACHE_KEYS.CATEGORIES_L1,
       async () => {
-        const { data } = await supabase.from('categories').select('*').order('display_order');
-        return (data ?? []).filter((c: any) => c.level === 1);
+        const { data } = await supabase
+          .from('categories')
+          .select('category_id, name, image_url, display_order')
+          .eq('is_active', true)
+          .is('parent_id', null)
+          .order('display_order', { ascending: true });
+        return data ?? [];
       },
-      { ttl: CACHE_TTL.LONG, onBackgroundUpdate: (fresh) => setCategories(fresh) }
+      { ttl: CACHE_TTL.MEDIUM, onBackgroundUpdate: (fresh) => setCategories(fresh) }
     ).then((data) => setCategories(data));
 
     // 3. Featured Products with cache
@@ -97,19 +106,39 @@ export function HomePage() {
       { ttl: CACHE_TTL.SHORT, onBackgroundUpdate: (fresh) => setAllProducts(fresh) }
     ).then((data) => setAllProducts(data));
 
-    // 4. Active Sellers with cache
+    // 4. Active Sellers with cache (including logo and banner, limit 6)
     cacheService.fetchWithCache(
       CACHE_KEYS.ACTIVE_SELLERS,
       async () => {
-        const { data } = await supabase
-          .from('sellers')
-          .select('seller_id, business_name, account_status')
-          .eq('account_status', 'active')
-          .limit(6);
-        return data ?? [];
+        try {
+          const { data, error } = await supabase
+            .from('sellers')
+            .select('*')
+            .in('account_status', ['active', 'approved'])
+            .limit(6);
+
+          if (!error && data && data.length > 0) {
+            return data;
+          }
+
+          // Fallback: fetch any available sellers
+          const { data: fallback } = await supabase
+            .from('sellers')
+            .select('*')
+            .limit(6);
+
+          return fallback ?? [];
+        } catch (e) {
+          console.warn('[HomePage] Active sellers fetch catch:', e);
+          return [];
+        }
       },
       { ttl: CACHE_TTL.SHORT, onBackgroundUpdate: (fresh) => setSellers(fresh) }
-    ).then((data) => setSellers(data));
+    ).then((data) => {
+      if (data && data.length > 0) {
+        setSellers(data);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -438,26 +467,79 @@ export function HomePage() {
         {sellers.length > 0 && (
           <section id="verified-makers" className="space-y-4 scroll-mt-24">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Users className="w-5 h-5 text-emerald-600" />Verified Makers & Artisans</h2>
-              <Link to="/shop" className="text-xs font-semibold text-emerald-700 hover:underline">Explore All Stores</Link>
+              <h2 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" />
+                Verified Makers & Artisans
+              </h2>
+              <Link to="/shop" className="text-xs font-semibold text-emerald-700 hover:underline">
+                Explore All Stores
+              </Link>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {sellers.map((s) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4">
+              {sellers.slice(0, 6).map((s) => (
                 <Link
                   key={s.seller_id}
                   to={`/seller/${s.seller_id}`}
-                  className="bg-white border border-neutral-200 hover:border-emerald-400 rounded-xl p-3.5 text-center shadow-xs hover:shadow-md transition-all flex flex-col items-center justify-between cursor-pointer group"
+                  className="bg-white border border-neutral-200 hover:border-emerald-500 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col cursor-pointer group"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 font-black text-lg flex items-center justify-center border border-emerald-200 mb-2 group-hover:scale-105 transition-transform">
-                    {s.business_name?.charAt(0).toUpperCase() || 'A'}
+                  {/* Banner Image */}
+                  <div className="h-20 sm:h-24 w-full relative bg-neutral-100 overflow-hidden shrink-0">
+                    {s.banner_url ? (
+                      <img
+                        src={s.banner_url}
+                        alt={`${s.business_name} Banner`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-linear-to-r from-emerald-800 to-teal-900 opacity-90 flex items-center justify-center">
+                        <span className="text-white/20 text-xs sm:text-sm font-black tracking-wider uppercase select-none line-clamp-1 px-2">
+                          {s.business_name}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Store Logo / Avatar */}
+                    <div className="absolute -bottom-4 left-3 w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 border-white bg-white shadow-sm flex items-center justify-center shrink-0">
+                      {s.logo_url ? (
+                        <img
+                          src={s.logo_url}
+                          alt={s.business_name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-emerald-100 text-emerald-800 font-extrabold text-sm sm:text-base flex items-center justify-center">
+                          {s.business_name?.charAt(0).toUpperCase() || 'A'}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <h4 className="text-xs font-bold text-neutral-900 line-clamp-1 group-hover:text-emerald-700 transition-colors">
-                    {s.business_name}
-                  </h4>
-                  <p className="text-[10px] text-neutral-400 mt-0.5">India</p>
-                  <span className="mt-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                    Verified
-                  </span>
+
+                  {/* Store Details */}
+                  <div className="p-3 pt-5 flex flex-col justify-between flex-1">
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-neutral-900 line-clamp-1 group-hover:text-emerald-700 transition-colors">
+                        {s.business_name}
+                      </h4>
+                      <p className="text-[10px] text-neutral-500 mt-0.5 flex items-center gap-1 line-clamp-1">
+                        <MapPin className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
+                        <span>{s.shipping_state || 'India'}</span>
+                        {s.owner_name && <span className="text-neutral-300">•</span>}
+                        {s.owner_name && <span className="line-clamp-1 text-neutral-400">{s.owner_name}</span>}
+                      </p>
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                        <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />
+                        Verified
+                      </span>
+                      <span className="text-[10px] font-semibold text-neutral-400 group-hover:text-emerald-600 flex items-center gap-0.5 transition-colors">
+                        Visit <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>

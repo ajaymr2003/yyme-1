@@ -57,34 +57,41 @@ export const cacheService = {
 
     if (!entry) return null;
 
-    const isStale = Date.now() - entry.timestamp > entry.ttl;
-    if (isStale && !allowStale) {
-      return null;
-    }
+    const isStale = (Date.now() - entry.timestamp > entry.ttl) || (Array.isArray(entry.data) && entry.data.length === 0);
+    if (!allowStale && isStale) return null;
 
     return { data: entry.data, isStale };
   },
 
   /**
-   * Store data in both Memory and SessionStorage
+   * Set an entry into Memory and SessionStorage
    */
   set<T>(key: string, data: T, ttl = CACHE_TTL.SHORT): void {
+    // Avoid caching empty lists for long TTLs
+    const effectiveTtl = (Array.isArray(data) && data.length === 0) ? 1000 : ttl;
+
     const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
-      ttl,
+      ttl: effectiveTtl,
     };
 
     memoryCache.set(key, entry);
 
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
-        sessionStorage.setItem(key, JSON.stringify(entry));
+        if (Array.isArray(data) && data.length === 0) {
+          sessionStorage.removeItem(key);
+        } else {
+          sessionStorage.setItem(key, JSON.stringify(entry));
+        }
       } catch (err) {
         // If quota exceeded, clear stale entries from sessionStorage
         try {
           sessionStorage.clear();
-          sessionStorage.setItem(key, JSON.stringify(entry));
+          if (!Array.isArray(data) || data.length > 0) {
+            sessionStorage.setItem(key, JSON.stringify(entry));
+          }
         } catch {
           // Ignore
         }
@@ -112,7 +119,7 @@ export const cacheService = {
     // Check cache
     const cached = this.get<T>(key, swr);
 
-    if (cached) {
+    if (cached && (!Array.isArray(cached.data) || cached.data.length > 0)) {
       // If stale and SWR is active, trigger background revalidation
       if (cached.isStale && swr) {
         fetcher()
@@ -129,7 +136,7 @@ export const cacheService = {
       return cached.data;
     }
 
-    // Cache miss: execute fetcher
+    // Cache miss or empty: execute fetcher
     const fresh = await fetcher();
     this.set(key, fresh, ttl);
     return fresh;
