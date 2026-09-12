@@ -139,22 +139,16 @@ export function BuyerLayout() {
             )}
 
             {/* Logo */}
-            <Link to="/" className="shrink-0 flex items-center pl-0.5">
+            <Link to="/" className="shrink-0 flex items-center gap-1.5 sm:gap-2 pl-0.5 group">
               <img
-                src="/logo.png"
+                src="/logo_only.png"
+                alt="YYMEE Logo"
+                className="h-7 sm:h-8 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
+              />
+              <img
+                src="/name_only.png"
                 alt="YYMEE"
-                className="h-6 sm:h-7 w-auto object-contain"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent && !parent.querySelector('.logo-fallback')) {
-                    const fallback = document.createElement('div');
-                    fallback.className = 'logo-fallback flex items-center gap-1 font-black text-base text-neutral-900 tracking-tight';
-                    fallback.innerHTML = '<span class="text-emerald-600">YY</span>MEE';
-                    parent.appendChild(fallback);
-                  }
-                }}
+                className="h-4 sm:h-5 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
               />
             </Link>
 

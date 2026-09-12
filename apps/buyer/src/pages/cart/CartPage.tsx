@@ -22,7 +22,7 @@ export function CartPage() {
       <h2 className="text-lg font-bold text-neutral-900">Your cart is empty</h2>
       <p className="text-sm text-neutral-500 mt-1">Browse products and add items to your cart</p>
       <button
-        onClick={() => navigate('/shop')}
+        onClick={() => navigate('/')}
         className="mt-5 px-6 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
       >
         Browse Shop
