@@ -11,7 +11,13 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "strict": true
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ymenet/theme": ["../../packages/theme/index.ts"],
+      "@ymenet/utils": ["../../packages/utils/index.ts"],
+      "@ymenet/ui": ["../../packages/ui/index.ts"]
+    }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src"]
 }

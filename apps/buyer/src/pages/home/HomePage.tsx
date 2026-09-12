@@ -422,19 +422,29 @@ export function HomePage() {
 
         {/* Sellers */}
         {sellers.length > 0 && (
-          <section className="space-y-4">
+          <section id="verified-makers" className="space-y-4 scroll-mt-24">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Users className="w-5 h-5 text-emerald-600" />Verified Makers & Artisans</h2>
               <Link to="/shop" className="text-xs font-semibold text-emerald-700 hover:underline">Explore All Stores</Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
               {sellers.map((s) => (
-                <div key={s.seller_id} className="bg-white border border-neutral-200 rounded-xl p-3.5 text-center shadow-xs flex flex-col items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 font-black text-lg flex items-center justify-center border border-emerald-200 mb-2">{s.business_name?.charAt(0).toUpperCase() || 'A'}</div>
-                  <h4 className="text-xs font-bold text-neutral-900 line-clamp-1">{s.business_name}</h4>
+                <Link
+                  key={s.seller_id}
+                  to={`/seller/${s.seller_id}`}
+                  className="bg-white border border-neutral-200 hover:border-emerald-400 rounded-xl p-3.5 text-center shadow-xs hover:shadow-md transition-all flex flex-col items-center justify-between cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 font-black text-lg flex items-center justify-center border border-emerald-200 mb-2 group-hover:scale-105 transition-transform">
+                    {s.business_name?.charAt(0).toUpperCase() || 'A'}
+                  </div>
+                  <h4 className="text-xs font-bold text-neutral-900 line-clamp-1 group-hover:text-emerald-700 transition-colors">
+                    {s.business_name}
+                  </h4>
                   <p className="text-[10px] text-neutral-400 mt-0.5">India</p>
-                  <span className="mt-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Verified</span>
-                </div>
+                  <span className="mt-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                    Verified
+                  </span>
+                </Link>
               ))}
             </div>
           </section>

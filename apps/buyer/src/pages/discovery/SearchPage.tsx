@@ -6,8 +6,12 @@ import { formatINR } from '@ymenet/utils';
 import { ShoppingCart, Store, Search, X, Package } from 'lucide-react';
 
 export function SearchPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
+  const maxPriceParam = searchParams.get('max_price');
+  const filterParam = searchParams.get('filter');
+  const sortParam = searchParams.get('sort');
+
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useAuth();
@@ -18,23 +22,76 @@ export function SearchPage() {
   const [addedToast, setAddedToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!searchQuery.trim()) { setProducts([]); return; }
+    setSearchQuery(query);
+  }, [query]);
+
+  useEffect(() => {
+    const hasFilters = searchQuery.trim() || maxPriceParam || filterParam || sortParam;
+    if (!hasFilters) {
+      setProducts([]);
+      return;
+    }
+
     setLoading(true);
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+
     supabase.from('products')
       .select('*, seller:sellers(seller_id, business_name, whatsapp_number), category:categories(name)')
-      .eq('is_active', true).eq('qc_status', 'verified')
+      .eq('is_active', true)
+      .eq('qc_status', 'verified')
       .then(({ data }) => {
-        const all = data ?? [];
-        const filtered = all.filter((p: any) =>
-          p.name?.toLowerCase().includes(q) ||
-          p.category?.name?.toLowerCase().includes(q) ||
-          p.description?.toLowerCase().includes(q)
-        );
-        setProducts(filtered);
+        let list = data ?? [];
+
+        // 1. Text Search Filter
+        if (q) {
+          list = list.filter((p: any) =>
+            p.name?.toLowerCase().includes(q) ||
+            p.category?.name?.toLowerCase().includes(q) ||
+            p.description?.toLowerCase().includes(q) ||
+            p.seller?.business_name?.toLowerCase().includes(q)
+          );
+        }
+
+        // 2. Price Filter (Under ₹499 / max_price)
+        if (maxPriceParam) {
+          const maxP = parseFloat(maxPriceParam);
+          if (!isNaN(maxP)) {
+            list = list.filter((p: any) => p.base_price <= maxP);
+          }
+        }
+
+        // 3. Deals Filter
+        if (filterParam === 'deals') {
+          list = list.filter((p: any) => p.mrp && p.mrp > p.base_price);
+        }
+
+        // 4. Sorting
+        if (sortParam === 'new') {
+          list = [...list].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        } else if (sortParam === 'best') {
+          list = [...list].sort((a: any, b: any) => (b.moq || 1) - (a.moq || 1));
+        } else if (maxPriceParam) {
+          list = [...list].sort((a: any, b: any) => a.base_price - b.base_price);
+        }
+
+        setProducts(list);
         setLoading(false);
       });
-  }, [searchQuery]);
+  }, [searchQuery, maxPriceParam, filterParam, sortParam]);
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setSearchParams({});
+  };
+
+  const getPageTitle = () => {
+    if (searchQuery) return `Results for "${searchQuery}"`;
+    if (maxPriceParam) return `Budget Finds Under ₹${maxPriceParam}`;
+    if (filterParam === 'deals') return `Hot Deals & Special Discounts`;
+    if (sortParam === 'new') return `New & Fresh Arrivals`;
+    if (sortParam === 'best') return `Best Selling Crafts`;
+    return 'Search Catalog';
+  };
 
   const showAddedToast = (name: string) => { setAddedToast(`Added "${name}" to cart!`); setTimeout(() => setAddedToast(null), 2500); };
 
@@ -51,22 +108,69 @@ export function SearchPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
             <input
-              type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); navigate(`/search?q=${encodeURIComponent(e.target.value)}`, { replace: true }); }}
-              placeholder="Search products..."
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                navigate(`/search?q=${encodeURIComponent(e.target.value)}`, { replace: true });
+              }}
+              placeholder="Search handcrafted products, categories, artisans..."
               className="w-full pl-10 pr-10 py-2.5 rounded-xl text-sm bg-neutral-50 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              autoFocus
+              autoFocus={!maxPriceParam && !filterParam && !sortParam}
             />
-            {searchQuery && <button onClick={() => { setSearchQuery(''); navigate('/search'); }} className="absolute right-3 top-1/2 -translate-y-1/2"><X className="w-4 h-4 text-neutral-400" /></button>}
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  navigate('/search');
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer p-1"
+              >
+                <X className="w-4 h-4 text-neutral-400 hover:text-neutral-700" />
+              </button>
+            )}
           </div>
-          {searchQuery && <p className="text-xs text-neutral-500 mt-2">{products.length} results for "{searchQuery}"</p>}
+
+          {(searchQuery || maxPriceParam || filterParam || sortParam) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-neutral-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-neutral-800">
+                  {getPageTitle()}
+                </span>
+                <span className="text-xs text-neutral-500">
+                  ({products.length} {products.length === 1 ? 'item' : 'items'})
+                </span>
+              </div>
+
+              {(maxPriceParam || filterParam || sortParam || searchQuery) && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline cursor-pointer"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24 text-neutral-500 text-sm">Searching...</div>
-        ) : products.length === 0 && searchQuery ? (
+          <div className="flex items-center justify-center py-24 text-neutral-500 text-sm">Loading products...</div>
+        ) : products.length === 0 && (searchQuery || maxPriceParam || filterParam || sortParam) ? (
           <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
             <Package className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-neutral-800">No products found for "{searchQuery}"</p>
+            <p className="text-sm font-semibold text-neutral-800">No products found for this filter</p>
+            <button
+              onClick={clearAllFilters}
+              className="mt-3 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors"
+            >
+              Browse All Products
+            </button>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
+            <Search className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-neutral-800">Type in the search box or choose a category</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">

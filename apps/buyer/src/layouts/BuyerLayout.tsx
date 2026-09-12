@@ -28,7 +28,7 @@ export function BuyerLayout() {
   });
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleAccountMouseEnter = () => {
     if (hoverTimeoutRef.current) {
